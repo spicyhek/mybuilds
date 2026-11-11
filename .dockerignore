@@ -1,0 +1,9 @@
+.git
+.github
+.cursor
+demo
+data
+*.db
+*.db-wal
+*.db-shm
+*.md

@@ -31,3 +31,10 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# mybuilds
+/data/
+*.db
+*.db-wal
+*.db-shm
+/bin/

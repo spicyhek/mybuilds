@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mybuilds</title>
+<style>
+:root { --bg: #ffffff; --fg: #1f2328; --muted: #656d76; --line: #d8dee4; --ok: #1a7f37; --bad: #cf222e; --warn: #9a6700; --run: #0969da; --pend: #8c959f; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0d1117; --fg: #e6edf3; --muted: #8b949e; --line: #30363d; --ok: #3fb950; --bad: #f85149; --warn: #d29922; --run: #58a6ff; --pend: #6e7681; }
+}
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+h1 { font-size: 20px; margin: 0 0 4px; }
+.note { color: var(--muted); margin: 0 0 20px; }
+article { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
+header { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+header b { font-size: 16px; }
+.tag { font-size: 11px; letter-spacing: .04em; border: 1px solid currentColor; border-radius: 4px; padding: 0 5px; }
+.muted { color: var(--muted); font-size: 13px; }
+ol { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin: 10px 0 0; }
+li { border-radius: 999px; padding: 2px 10px; font-size: 13px; border: 1px solid var(--pend); color: var(--pend); }
+li[data-state="succeeded"] { border-color: var(--ok); color: var(--ok); }
+li[data-state="failed"] { border-color: var(--bad); color: var(--bad); }
+li[data-state="degraded"] { border-color: var(--warn); color: var(--warn); }
+li[data-state="running"] { border-color: var(--run); color: var(--run); }
+li[data-state="unknown"] { border-style: dashed; }
+li[data-state="skipped"] { opacity: .6; text-decoration: line-through; }
+code { font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>mybuilds</h1>
+  <p class="note">Placeholder page. The pipeline view is on its way; until then this lists what <code>GET /api/v1/releases</code> returns.</p>
+  <div id="releases"><p class="muted">Loading…</p></div>
+</main>
+<script>
+(async () => {
+  const root = document.getElementById('releases');
+  try {
+    const res = await fetch('/api/v1/releases');
+    if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+    const { releases } = await res.json();
+    if (!releases.length) {
+      root.replaceChildren(text('p', 'No releases recorded yet.', 'muted'));
+      return;
+    }
+    root.replaceChildren(...releases.map(render));
+  } catch (err) {
+    root.replaceChildren(text('p', 'Could not load releases: ' + err, 'muted'));
+  }
+
+  function render(r) {
+    const article = document.createElement('article');
+    const header = document.createElement('header');
+    header.append(text('b', r.service));
+    if (r.drill) header.append(text('span', 'DRILL', 'tag'));
+    if (r.kind === 'config') header.append(text('span', 'CONFIG', 'tag'));
+    header.append(text('span', r.release_id, 'muted'));
+    header.append(text('span', new Date(r.created_at).toLocaleString(), 'muted'));
+    header.append(text('span', r.status, 'tag'));
+    article.append(header);
+
+    const stages = document.createElement('ol');
+    for (const s of r.stages) {
+      const li = text('li', s.key);
+      li.dataset.state = s.state;
+      li.title = s.summary || s.failure_reason || s.state;
+      stages.append(li);
+    }
+    article.append(stages);
+    return article;
+  }
+
+  function text(tag, content, className) {
+    const el = document.createElement(tag);
+    el.textContent = content;
+    if (className) el.className = className;
+    return el;
+  }
+})();
+</script>
+</body>
+</html>

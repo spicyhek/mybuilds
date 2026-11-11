@@ -1,0 +1,185 @@
+package httpapi
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/spicyhek/mybuilds/internal/fixtures"
+	"github.com/spicyhek/mybuilds/internal/storage"
+	"github.com/spicyhek/mybuilds/web"
+)
+
+const testReleaseID = "mybuilds/0123456/production/7"
+
+func newTestServer(t *testing.T) (http.Handler, *storage.Store) {
+	t.Helper()
+	ctx := context.Background()
+
+	store, err := storage.Open(ctx, filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { store.Close() })
+	if _, err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fixtures.Load(ctx, store); err != nil {
+		t.Fatal(err)
+	}
+
+	dist, err := web.Dist()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	h := New(Options{
+		Store:     store,
+		ReleaseID: testReleaseID,
+		Version:   "test",
+		Metrics:   NewMetrics(prometheus.NewRegistry(), "test"),
+		Web:       dist,
+	})
+	return h, store
+}
+
+func get(t *testing.T, h http.Handler, path string) *httptest.ResponseRecorder {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+	return rec
+}
+
+func TestHealthz(t *testing.T) {
+	h, _ := newTestServer(t)
+	rec := get(t, h, "/healthz")
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if got := rec.Header().Get("X-Release-ID"); got != testReleaseID {
+		t.Errorf("X-Release-ID = %q", got)
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Errorf("Cache-Control = %q", got)
+	}
+	if rec.Header().Get("X-Request-ID") == "" {
+		t.Error("missing X-Request-ID")
+	}
+}
+
+func TestReadyz(t *testing.T) {
+	h, store := newTestServer(t)
+
+	if rec := get(t, h, "/readyz"); rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body %q", rec.Code, rec.Body.String())
+	}
+
+	store.Close()
+	if rec := get(t, h, "/readyz"); rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status after close = %d, want 503", rec.Code)
+	}
+}
+
+func TestListReleases(t *testing.T) {
+	h, _ := newTestServer(t)
+	rec := get(t, h, "/api/v1/releases")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body %s", rec.Code, rec.Body.String())
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+		t.Errorf("Content-Type = %q", ct)
+	}
+
+	var body struct {
+		Releases   []map[string]any `json:"releases"`
+		NextCursor *string          `json:"next_cursor"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	want, _ := fixtures.Releases()
+	if len(body.Releases) != len(want) {
+		t.Fatalf("got %d releases, want %d", len(body.Releases), len(want))
+	}
+	if body.NextCursor != nil {
+		t.Errorf("next_cursor = %v, want null", *body.NextCursor)
+	}
+
+	first := body.Releases[0]
+	if first["release_id"] != "drill-target/89abcde/production/4" {
+		t.Errorf("newest first: got %v", first["release_id"])
+	}
+	if first["drill"] != true {
+		t.Errorf("drill flag missing: %v", first)
+	}
+	if _, leaked := first["uuid"]; leaked {
+		t.Error("internal uuid leaked into the public view")
+	}
+	if stages, ok := first["stages"].([]any); !ok || len(stages) != 7 {
+		t.Errorf("stages = %v", first["stages"])
+	}
+}
+
+func TestListReleasesRejectsBadLimit(t *testing.T) {
+	h, _ := newTestServer(t)
+	for _, limit := range []string{"0", "201", "abc"} {
+		if rec := get(t, h, "/api/v1/releases?limit="+limit); rec.Code != http.StatusBadRequest {
+			t.Errorf("limit=%s: status = %d, want 400", limit, rec.Code)
+		}
+	}
+	if rec := get(t, h, "/api/v1/releases?limit=1"); rec.Code != http.StatusOK {
+		t.Errorf("limit=1: status = %d", rec.Code)
+	}
+}
+
+func TestGetReleaseWithSlashesInID(t *testing.T) {
+	h, _ := newTestServer(t)
+
+	rec := get(t, h, "/api/v1/releases/personal-site/ce61154/production/11")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body %s", rec.Code, rec.Body.String())
+	}
+	var got map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["release_id"] != "personal-site/ce61154/production/11" || got["kind"] != "application" {
+		t.Errorf("got %v", got)
+	}
+
+	rec = get(t, h, "/api/v1/releases/personal-site/0000000/production/1")
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("missing release: status = %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), `"error"`) {
+		t.Errorf("404 body is not JSON: %s", rec.Body.String())
+	}
+
+	if rec := get(t, h, "/api/v1/nope"); rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), `"error"`) {
+		t.Errorf("unknown API path: status = %d body %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestStaticAndSPAFallback(t *testing.T) {
+	h, _ := newTestServer(t)
+
+	for _, path := range []string{"/", "/releases/personal-site/ce61154/production/11"} {
+		rec := get(t, h, path)
+		if rec.Code != http.StatusOK {
+			t.Errorf("%s: status = %d", path, rec.Code)
+		}
+		if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+			t.Errorf("%s: Content-Type = %q", path, ct)
+		}
+		if !strings.Contains(rec.Body.String(), "<title>mybuilds</title>") {
+			t.Errorf("%s: did not serve index.html", path)
+		}
+	}
+}
