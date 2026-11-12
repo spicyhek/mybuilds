@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/spicyhek/mybuilds/internal/events"
+	"github.com/spicyhek/mybuilds/internal/ingest"
 	"github.com/spicyhek/mybuilds/internal/storage"
 )
 
@@ -20,6 +22,8 @@ type Options struct {
 	Version   string
 	Metrics   *Metrics
 	Logger    *slog.Logger
+	// Ingest receives provider events. Nil leaves the ingestion routes out.
+	Ingest *ingest.Ingester
 	// Web is the built frontend. Unknown paths outside /api fall back to its
 	// index.html so the client-side router can take over.
 	Web fs.FS
@@ -53,9 +57,16 @@ func New(o Options) http.Handler {
 	// Release IDs contain slashes (service/sha/environment/run), so the
 	// wildcard has to take the rest of the path.
 	mux.HandleFunc("GET /api/v1/releases/{id...}", s.getRelease)
-	mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
+	if o.Ingest != nil {
+		mux.Handle("POST /hooks/github", o.Ingest.Handler(events.ProviderGitHub))
+		mux.Handle("POST /hooks/argocd", o.Ingest.Handler(events.ProviderArgoCD))
+		mux.Handle("POST /api/v1/ci-events", o.Ingest.Handler(events.ProviderCI))
+	}
+	notFound := func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusNotFound, "not found")
-	})
+	}
+	mux.HandleFunc("/api/", notFound)
+	mux.HandleFunc("/hooks/", notFound)
 	if o.Web != nil {
 		mux.Handle("/", spaHandler(o.Web))
 	}

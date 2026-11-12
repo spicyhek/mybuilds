@@ -25,6 +25,7 @@ type releaseView struct {
 	Template         string      `json:"template"`
 	Drill            bool        `json:"drill"`
 	DrillScenario    string      `json:"drill_scenario,omitempty"`
+	Superseded       bool        `json:"superseded"`
 	SourceRepository string      `json:"source_repository,omitempty"`
 	SourceSHA        string      `json:"source_sha,omitempty"`
 	Artifact         string      `json:"artifact,omitempty"`
@@ -47,6 +48,18 @@ type stageView struct {
 	CompletedAt   *time.Time `json:"completed_at,omitempty"`
 	Summary       string     `json:"summary,omitempty"`
 	FailureReason string     `json:"failure_reason,omitempty"`
+	// Steps are present on the single-release endpoint only.
+	Steps []stepView `json:"steps,omitempty"`
+}
+
+type stepView struct {
+	Position      int        `json:"position"`
+	Name          string     `json:"name"`
+	State         string     `json:"state"`
+	StartedAt     *time.Time `json:"started_at,omitempty"`
+	CompletedAt   *time.Time `json:"completed_at,omitempty"`
+	Detail        string     `json:"detail,omitempty"`
+	Reconstructed bool       `json:"reconstructed,omitempty"`
 }
 
 type listReleasesResponse struct {
@@ -59,6 +72,18 @@ type listReleasesResponse struct {
 func toView(r releases.Release) releaseView {
 	stages := make([]stageView, 0, len(r.Stages))
 	for _, st := range r.Stages {
+		var steps []stepView
+		for _, sp := range st.Steps {
+			steps = append(steps, stepView{
+				Position:      sp.Position,
+				Name:          sp.Name,
+				State:         string(sp.State),
+				StartedAt:     sp.StartedAt,
+				CompletedAt:   sp.CompletedAt,
+				Detail:        sp.Detail,
+				Reconstructed: sp.Reconstructed,
+			})
+		}
 		stages = append(stages, stageView{
 			Key:           st.Key,
 			Position:      st.Position,
@@ -68,6 +93,7 @@ func toView(r releases.Release) releaseView {
 			CompletedAt:   st.CompletedAt,
 			Summary:       st.Summary,
 			FailureReason: st.FailureReason,
+			Steps:         steps,
 		})
 	}
 	return releaseView{
@@ -78,6 +104,7 @@ func toView(r releases.Release) releaseView {
 		Template:         r.Template,
 		Drill:            r.Drill,
 		DrillScenario:    r.DrillScenario,
+		Superseded:       r.Superseded,
 		SourceRepository: r.SourceRepository,
 		SourceSHA:        r.SourceSHA,
 		Artifact:         r.Artifact,

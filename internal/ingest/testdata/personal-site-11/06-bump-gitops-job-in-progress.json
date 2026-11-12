@@ -1,0 +1,121 @@
+{
+  "provider": "github",
+  "headers": {
+    "X-GitHub-Event": "workflow_job",
+    "X-GitHub-Delivery": "7b0e2f10-bd61-11f1-8a1e-0b6f2c1a0006"
+  },
+  "body": {
+    "action": "in_progress",
+    "workflow_job": {
+      "id": 128716793329,
+      "run_id": 42475748808,
+      "run_attempt": 1,
+      "node_id": "CR_kwDORYVsSs8AAAAd-B5l8Q",
+      "head_sha": "ce61154e05756b0a7e40311de30dccaa0273f305",
+      "url": "https://api.github.com/repos/spicyhek/homelab-hosted-personal-site/actions/jobs/128716793329",
+      "html_url": "https://github.com/spicyhek/homelab-hosted-personal-site/actions/runs/42475748808/job/128716793329",
+      "status": "in_progress",
+      "conclusion": null,
+      "created_at": "2026-11-08T11:27:13Z",
+      "started_at": "2026-11-08T11:27:16Z",
+      "completed_at": null,
+      "name": "bump-gitops",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "in_progress",
+          "conclusion": null,
+          "number": 1,
+          "started_at": "2026-11-08T11:27:17Z",
+          "completed_at": null
+        },
+        {
+          "name": "Check out app repository",
+          "status": "queued",
+          "conclusion": null,
+          "number": 2,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Check for newer commit",
+          "status": "queued",
+          "conclusion": null,
+          "number": 3,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Check out infra repository",
+          "status": "queued",
+          "conclusion": null,
+          "number": 4,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Pin image digest",
+          "status": "queued",
+          "conclusion": null,
+          "number": 5,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Commit and open pull request",
+          "status": "queued",
+          "conclusion": null,
+          "number": 6,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Squash merge",
+          "status": "queued",
+          "conclusion": null,
+          "number": 7,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Post Check out infra repository",
+          "status": "queued",
+          "conclusion": null,
+          "number": 13,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Post Check out app repository",
+          "status": "queued",
+          "conclusion": null,
+          "number": 14,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Complete job",
+          "status": "queued",
+          "conclusion": null,
+          "number": 15,
+          "started_at": null,
+          "completed_at": null
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/spicyhek/homelab-hosted-personal-site/check-runs/128716793329",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000001102,
+      "runner_name": "GitHub Actions 1000001102",
+      "runner_group_name": "GitHub Actions",
+      "workflow_name": "Build Push and Update Infra",
+      "head_branch": "main"
+    },
+    "repository": {
+      "id": 1166371914,
+      "full_name": "spicyhek/homelab-hosted-personal-site",
+      "private": false
+    }
+  }
+}

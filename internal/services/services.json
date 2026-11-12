@@ -1,0 +1,19 @@
+{
+  "services": [
+    {
+      "name": "personal-site",
+      "environment": "production",
+      "repository": "spicyhek/homelab-hosted-personal-site",
+      "workflow": ".github/workflows/release.yml",
+      "branch": "main",
+      "argocd_application": "personal-site",
+      "jobs": {
+        "build": {
+          "stage": "build",
+          "from_step": [{ "step": "Push image", "stage": "publish" }]
+        },
+        "bump-gitops": { "stage": "gitops" }
+      }
+    }
+  ]
+}

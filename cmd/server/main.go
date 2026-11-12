@@ -19,6 +19,9 @@ import (
 	"github.com/spicyhek/mybuilds/internal/config"
 	"github.com/spicyhek/mybuilds/internal/fixtures"
 	"github.com/spicyhek/mybuilds/internal/httpapi"
+	"github.com/spicyhek/mybuilds/internal/ingest"
+	"github.com/spicyhek/mybuilds/internal/releases"
+	"github.com/spicyhek/mybuilds/internal/services"
 	"github.com/spicyhek/mybuilds/internal/storage"
 	"github.com/spicyhek/mybuilds/web"
 )
@@ -65,6 +68,37 @@ func run() error {
 		logger.Info("fixture mode", "releases_inserted", n)
 	}
 
+	svcs, err := services.Load(cfg.ServicesFile)
+	if err != nil {
+		return err
+	}
+	projector := releases.NewProjector(store, svcs, logger)
+	// Rebuild every release from its events, so a projector change applies
+	// to history. A release that fails to project is logged, not fatal: its
+	// events are safe and the next deploy can fix the projector.
+	rebuilt, err := projector.RebuildAll(ctx)
+	if err != nil {
+		logger.Error("rebuild projections", "error", err)
+	}
+	logger.Info("projections rebuilt", "releases", rebuilt, "services", len(svcs.Services()))
+
+	ingester := ingest.New(ingest.Options{
+		Store:     store,
+		Projector: projector,
+		Services:  svcs,
+		Secrets: ingest.Secrets{
+			GitHubWebhook: cfg.GitHubWebhookSecret,
+			CIEvents:      cfg.CIEventSecret,
+			ArgoCDToken:   cfg.ArgoCDToken,
+		},
+		Logger:     logger,
+		Registerer: prometheus.DefaultRegisterer,
+	})
+	logger.Info("ingestion",
+		"github", cfg.GitHubWebhookSecret != "",
+		"ci", cfg.CIEventSecret != "",
+		"argocd", cfg.ArgoCDToken != "")
+
 	dist, err := web.Dist()
 	if err != nil {
 		return err
@@ -76,6 +110,7 @@ func run() error {
 		Version:   version,
 		Metrics:   httpapi.NewMetrics(prometheus.DefaultRegisterer, version),
 		Logger:    logger,
+		Ingest:    ingester,
 		Web:       dist,
 	})
 

@@ -1,0 +1,19 @@
+{
+  "provider": "ci",
+  "headers": {},
+  "body": {
+    "type": "release.published",
+    "release_id": "personal-site/ce61154/production/11",
+    "service": "personal-site",
+    "environment": "production",
+    "source_repository": "spicyhek/homelab-hosted-personal-site",
+    "source_sha": "ce61154e05756b0a7e40311de30dccaa0273f305",
+    "artifact": "ghcr.io/spicyhek/homelab-hosted-personal-site",
+    "artifact_digest": "sha256:9785af09091041a492b423d2aa88d98df1f980b5a056c055590d4b889bf092a5",
+    "workflow_run_id": 42475748808,
+    "workflow_run_number": 11,
+    "run_attempt": 1,
+    "drill": false,
+    "occurred_at": "2026-11-08T11:27:02Z"
+  }
+}

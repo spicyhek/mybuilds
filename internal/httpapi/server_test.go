@@ -12,6 +12,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/spicyhek/mybuilds/internal/fixtures"
+	"github.com/spicyhek/mybuilds/internal/ingest"
+	"github.com/spicyhek/mybuilds/internal/services"
 	"github.com/spicyhek/mybuilds/internal/storage"
 	"github.com/spicyhek/mybuilds/web"
 )
@@ -180,6 +182,36 @@ func TestStaticAndSPAFallback(t *testing.T) {
 		}
 		if !strings.Contains(rec.Body.String(), "<title>mybuilds</title>") {
 			t.Errorf("%s: did not serve index.html", path)
+		}
+	}
+}
+
+func TestIngestionRoutes(t *testing.T) {
+	_, store := newTestServer(t)
+	svcs, err := services.Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := New(Options{
+		Store:   store,
+		Metrics: NewMetrics(prometheus.NewRegistry(), "test"),
+		Ingest: ingest.New(ingest.Options{
+			Store:    store,
+			Services: svcs,
+			Secrets:  ingest.Secrets{GitHubWebhook: "s", CIEvents: "s", ArgoCDToken: "s"},
+		}),
+	})
+
+	for _, path := range []string{"/hooks/github", "/hooks/argocd", "/api/v1/ci-events"} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{}`)))
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("POST %s unsigned: status %d, want 401", path, rec.Code)
+		}
+	}
+	for _, path := range []string{"/hooks/github", "/hooks/nope"} {
+		if rec := get(t, h, path); rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), `"error"`) {
+			t.Errorf("GET %s: status %d body %s, want a JSON 404", path, rec.Code, rec.Body.String())
 		}
 	}
 }

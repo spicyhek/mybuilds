@@ -1,0 +1,37 @@
+{
+  "provider": "github",
+  "headers": {
+    "X-GitHub-Event": "workflow_run",
+    "X-GitHub-Delivery": "7b0e2f10-bd61-11f1-8a1e-0b6f2c1a0009"
+  },
+  "body": {
+    "action": "completed",
+    "workflow_run": {
+      "id": 42475748808,
+      "name": "Build Push and Update Infra",
+      "node_id": "WFR_kwLORYVsSs8AAAAJ48B9yA",
+      "head_branch": "main",
+      "head_sha": "ce61154e05756b0a7e40311de30dccaa0273f305",
+      "path": ".github/workflows/release.yml",
+      "display_title": "Merge pull request #3 from spicyhek/feat/mybuilds-m0-release-id",
+      "run_number": 11,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "workflow_id": 247290473,
+      "url": "https://api.github.com/repos/spicyhek/homelab-hosted-personal-site/actions/runs/42475748808",
+      "html_url": "https://github.com/spicyhek/homelab-hosted-personal-site/actions/runs/42475748808",
+      "created_at": "2026-11-08T11:26:25Z",
+      "updated_at": "2026-11-08T11:27:32Z",
+      "run_attempt": 1,
+      "run_started_at": "2026-11-08T11:26:25Z",
+      "jobs_url": "https://api.github.com/repos/spicyhek/homelab-hosted-personal-site/actions/runs/42475748808/jobs",
+      "logs_url": "https://api.github.com/repos/spicyhek/homelab-hosted-personal-site/actions/runs/42475748808/logs"
+    },
+    "repository": {
+      "id": 1166371914,
+      "full_name": "spicyhek/homelab-hosted-personal-site",
+      "private": false
+    }
+  }
+}

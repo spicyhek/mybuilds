@@ -1,0 +1,142 @@
+// Package services is the service map: which repository, workflow, jobs and
+// Argo CD application belong to each tracked service (plan sections 8.1, 8.8
+// and 8.9).
+package services
+
+import (
+	_ "embed"
+	"encoding/json"
+	"fmt"
+	"os"
+	"regexp"
+	"strings"
+)
+
+//go:embed services.json
+var defaultMap []byte
+
+// Service is one tracked service.
+type Service struct {
+	Name        string `json:"name"`
+	Environment string `json:"environment"`
+	// Repository is the source repository, owner/name.
+	Repository string `json:"repository"`
+	// Workflow is the release workflow's path in the repository.
+	Workflow string `json:"workflow"`
+	// Branch is the branch whose pushes are releases.
+	Branch            string         `json:"branch"`
+	ArgoCDApplication string         `json:"argocd_application"`
+	Jobs              map[string]Job `json:"jobs"`
+}
+
+// Job maps one workflow job's steps to pipeline stages.
+type Job struct {
+	// Stage is the job's default stage. Steps that match no FromStep rule
+	// land here, so renaming a step never hides it.
+	Stage string `json:"stage"`
+	// FromStep moves the named step and every step after it to another
+	// stage. Rules apply in order.
+	FromStep []StepStage `json:"from_step,omitempty"`
+}
+
+// StepStage starts a stage at a named step.
+type StepStage struct {
+	Step  string `json:"step"`
+	Stage string `json:"stage"`
+}
+
+// Map is the set of tracked services.
+type Map struct {
+	services []Service
+}
+
+var namePattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
+
+// Load reads the service map from path, or the built-in map when path is
+// empty.
+func Load(path string) (Map, error) {
+	data := defaultMap
+	if path != "" {
+		var err error
+		if data, err = os.ReadFile(path); err != nil {
+			return Map{}, fmt.Errorf("read service map: %w", err)
+		}
+	}
+	return Parse(data)
+}
+
+// Parse decodes and validates a service map.
+func Parse(data []byte) (Map, error) {
+	var doc struct {
+		Services []Service `json:"services"`
+	}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return Map{}, fmt.Errorf("parse service map: %w", err)
+	}
+	seen := map[string]bool{}
+	for i, s := range doc.Services {
+		switch {
+		case !namePattern.MatchString(s.Name):
+			return Map{}, fmt.Errorf("service %d: invalid name %q", i, s.Name)
+		case seen[s.Name]:
+			return Map{}, fmt.Errorf("service %q listed twice", s.Name)
+		case s.Environment == "" || s.Repository == "" || s.Workflow == "" || s.Branch == "":
+			return Map{}, fmt.Errorf("service %q: environment, repository, workflow and branch are required", s.Name)
+		}
+		seen[s.Name] = true
+	}
+	return Map{services: doc.Services}, nil
+}
+
+// Services returns every service in the map.
+func (m Map) Services() []Service {
+	return append([]Service(nil), m.services...)
+}
+
+// ByName finds a service by name.
+func (m Map) ByName(name string) (Service, bool) {
+	for _, s := range m.services {
+		if s.Name == name {
+			return s, true
+		}
+	}
+	return Service{}, false
+}
+
+// ByWorkflow finds the service released by a repository's workflow file.
+// Repository names compare case-insensitively, as on GitHub.
+func (m Map) ByWorkflow(repository, workflowPath string) (Service, bool) {
+	// Reusable and dynamic workflows can carry an @ref suffix.
+	workflowPath, _, _ = strings.Cut(workflowPath, "@")
+	for _, s := range m.services {
+		if strings.EqualFold(s.Repository, repository) && s.Workflow == workflowPath {
+			return s, true
+		}
+	}
+	return Service{}, false
+}
+
+// StageForStep returns the stage a job's step belongs to. ok is false for
+// jobs the service map does not know, such as a test job.
+func (s Service) StageForStep(jobName string, steps []string, index int) (stage string, ok bool) {
+	job, ok := s.Jobs[jobName]
+	if !ok {
+		return "", false
+	}
+	stage = job.Stage
+	for _, rule := range job.FromStep {
+		for i := 0; i <= index && i < len(steps); i++ {
+			if steps[i] == rule.Step {
+				stage = rule.Stage
+				break
+			}
+		}
+	}
+	return stage, true
+}
+
+// JobStage returns a job's default stage.
+func (s Service) JobStage(jobName string) (string, bool) {
+	job, ok := s.Jobs[jobName]
+	return job.Stage, ok
+}

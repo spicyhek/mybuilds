@@ -1,5 +1,4 @@
 -- Initial schema. See the plan, section 12.
--- Timestamps are RFC 3339 text in UTC. Booleans are 0 or 1.
 
 CREATE TABLE releases (
     uuid              TEXT    PRIMARY KEY,
@@ -27,7 +26,7 @@ CREATE INDEX releases_created_at ON releases (created_at DESC);
 CREATE INDEX releases_service    ON releases (service, created_at DESC);
 CREATE INDEX releases_gitops_sha ON releases (gitops_sha);
 
--- Every observation, immutable. The raw body is hashed, never stored.
+-- Every observation, immutable. 
 CREATE TABLE events (
     id                   INTEGER PRIMARY KEY AUTOINCREMENT,
     provider             TEXT    NOT NULL,

@@ -1,0 +1,177 @@
+{
+  "provider": "github",
+  "headers": {
+    "X-GitHub-Event": "workflow_job",
+    "X-GitHub-Delivery": "7b0e2f10-bd61-11f1-8a1e-0b6f2c1a0005"
+  },
+  "body": {
+    "action": "completed",
+    "workflow_job": {
+      "id": 128716616954,
+      "run_id": 42475748808,
+      "run_attempt": 1,
+      "node_id": "CR_kwDORYVsSs8AAAAd-Bu0-g",
+      "head_sha": "ce61154e05756b0a7e40311de30dccaa0273f305",
+      "url": "https://api.github.com/repos/spicyhek/homelab-hosted-personal-site/actions/jobs/128716616954",
+      "html_url": "https://github.com/spicyhek/homelab-hosted-personal-site/actions/runs/42475748808/job/128716616954",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-08T11:26:25Z",
+      "started_at": "2026-11-08T11:26:28Z",
+      "completed_at": "2026-11-08T11:27:13Z",
+      "name": "build",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-08T11:26:29Z",
+          "completed_at": "2026-11-08T11:26:32Z"
+        },
+        {
+          "name": "Check out app repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-08T11:26:32Z",
+          "completed_at": "2026-11-08T11:26:33Z"
+        },
+        {
+          "name": "Set release ID",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-08T11:26:33Z",
+          "completed_at": "2026-11-08T11:26:33Z"
+        },
+        {
+          "name": "Set up QEMU",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-08T11:26:33Z",
+          "completed_at": "2026-11-08T11:26:40Z"
+        },
+        {
+          "name": "Set up Docker Buildx",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-08T11:26:40Z",
+          "completed_at": "2026-11-08T11:26:44Z"
+        },
+        {
+          "name": "Log in to GitHub Container Registry",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-11-08T11:26:44Z",
+          "completed_at": "2026-11-08T11:26:45Z"
+        },
+        {
+          "name": "Build image",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-11-08T11:26:45Z",
+          "completed_at": "2026-11-08T11:26:49Z"
+        },
+        {
+          "name": "Smoke test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-11-08T11:26:49Z",
+          "completed_at": "2026-11-08T11:26:50Z"
+        },
+        {
+          "name": "Push image",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-11-08T11:26:50Z",
+          "completed_at": "2026-11-08T11:27:02Z"
+        },
+        {
+          "name": "Resolve digest",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-11-08T11:27:02Z",
+          "completed_at": "2026-11-08T11:27:02Z"
+        },
+        {
+          "name": "Post Push image",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-11-08T11:27:02Z",
+          "completed_at": "2026-11-08T11:27:04Z"
+        },
+        {
+          "name": "Post Build image",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-11-08T11:27:04Z",
+          "completed_at": "2026-11-08T11:27:06Z"
+        },
+        {
+          "name": "Post Log in to GitHub Container Registry",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-11-08T11:27:06Z",
+          "completed_at": "2026-11-08T11:27:07Z"
+        },
+        {
+          "name": "Post Set up Docker Buildx",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-11-08T11:27:07Z",
+          "completed_at": "2026-11-08T11:27:07Z"
+        },
+        {
+          "name": "Post Set up QEMU",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-11-08T11:27:07Z",
+          "completed_at": "2026-11-08T11:27:10Z"
+        },
+        {
+          "name": "Post Check out app repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-11-08T11:27:10Z",
+          "completed_at": "2026-11-08T11:27:10Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21,
+          "started_at": "2026-11-08T11:27:10Z",
+          "completed_at": "2026-11-08T11:27:10Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/spicyhek/homelab-hosted-personal-site/check-runs/128716616954",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000001101,
+      "runner_name": "GitHub Actions 1000001101",
+      "runner_group_name": "GitHub Actions",
+      "workflow_name": "Build Push and Update Infra",
+      "head_branch": "main"
+    },
+    "repository": {
+      "id": 1166371914,
+      "full_name": "spicyhek/homelab-hosted-personal-site",
+      "private": false
+    }
+  }
+}

@@ -56,6 +56,9 @@ type Release struct {
 	DeployedWith  string `json:"deployed_with,omitempty"`
 	Drill         bool   `json:"drill"`
 	DrillScenario string `json:"drill_scenario,omitempty"`
+	// Superseded marks a release whose promotion was skipped because a newer
+	// commit was already on the source branch. It is not a failure.
+	Superseded bool `json:"superseded"`
 
 	SourceRepository string `json:"source_repository,omitempty"`
 	SourceSHA        string `json:"source_sha,omitempty"`
@@ -82,6 +85,33 @@ type Stage struct {
 	CompletedAt   *time.Time `json:"completed_at,omitempty"`
 	Summary       string     `json:"summary,omitempty"`
 	FailureReason string     `json:"failure_reason,omitempty"`
+	// Steps of the stage's current attempt. Loaded for a single release only.
+	Steps []Step `json:"steps,omitempty"`
+}
+
+// Step is one step inside a stage (plan section 5.5).
+type Step struct {
+	StageKey    string     `json:"-"`
+	Attempt     int        `json:"attempt"`
+	Position    int        `json:"position"`
+	Name        string     `json:"name"`
+	State       State      `json:"state"`
+	StartedAt   *time.Time `json:"started_at,omitempty"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
+	// Detail is built from structured fields, never copied from logs.
+	Detail string `json:"detail,omitempty"`
+	// Reconstructed steps were rebuilt from object timestamps (section 8.8).
+	Reconstructed bool  `json:"reconstructed"`
+	SourceEventID int64 `json:"-"`
+}
+
+// Terminal reports whether a state is final for its attempt.
+func (s State) Terminal() bool {
+	switch s {
+	case StateSucceeded, StateFailed, StateDegraded, StateSkipped:
+		return true
+	}
+	return false
 }
 
 // NewUUID returns a random version 4 UUID.

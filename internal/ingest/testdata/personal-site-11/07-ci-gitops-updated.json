@@ -1,0 +1,15 @@
+{
+  "provider": "ci",
+  "headers": {},
+  "body": {
+    "type": "gitops.updated",
+    "release_id": "personal-site/ce61154/production/11",
+    "service": "personal-site",
+    "environment": "production",
+    "gitops_repository": "spicyhek/homelab-infra",
+    "gitops_sha": "f8c9de901999c2984662a926a18e31a531fd7821",
+    "workflow_run_id": 42475748808,
+    "run_attempt": 1,
+    "occurred_at": "2026-11-08T11:27:28Z"
+  }
+}

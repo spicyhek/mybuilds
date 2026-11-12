@@ -22,6 +22,26 @@ type Config struct {
 	ReleaseID string
 	// LogLevel is the minimum level written to the log.
 	LogLevel slog.Level
+	// ServicesFile is a service map to use instead of the built-in one.
+	ServicesFile string
+	// Ingestion secrets. An empty secret disables that endpoint. They are
+	// never logged.
+	GitHubWebhookSecret string
+	CIEventSecret       string
+	ArgoCDToken         string
+}
+
+// String hides the secrets, so a logged Config never leaks them.
+func (c Config) String() string {
+	set := func(s string) string {
+		if s == "" {
+			return "unset"
+		}
+		return "set"
+	}
+	return fmt.Sprintf("listen=%s metrics=%s db=%s fixtures=%t services_file=%q github_secret=%s ci_secret=%s argocd_token=%s",
+		c.Listen, c.MetricsListen, c.DBPath, c.Fixtures, c.ServicesFile,
+		set(c.GitHubWebhookSecret), set(c.CIEventSecret), set(c.ArgoCDToken))
 }
 
 // FromEnv builds a Config from MYBUILDS_* variables, with defaults for local use.
@@ -31,6 +51,11 @@ func FromEnv() (Config, error) {
 		MetricsListen: envOr("MYBUILDS_METRICS_LISTEN", ":9090"),
 		DBPath:        envOr("MYBUILDS_DB_PATH", "data/mybuilds.db"),
 		ReleaseID:     envOr("RELEASE_ID", "unknown"),
+		ServicesFile:  os.Getenv("MYBUILDS_SERVICES_FILE"),
+
+		GitHubWebhookSecret: os.Getenv("MYBUILDS_GITHUB_WEBHOOK_SECRET"),
+		CIEventSecret:       os.Getenv("MYBUILDS_CI_EVENT_SECRET"),
+		ArgoCDToken:         os.Getenv("MYBUILDS_ARGOCD_TOKEN"),
 	}
 
 	fixtures, err := envBool("MYBUILDS_FIXTURES", false)
