@@ -131,45 +131,56 @@ curl --fail-with-body --silent --show-error \
 
 ## Argo CD Notifications
 
-Draft configuration for `argocd-notifications-cm`, to be verified when the
-notifications are wired up. Argo CD templates do not know which trigger fired,
-so each trigger gets its own template that names it. Only the service's own
-Application counts as evidence; syncs of the same commit by the root
-`homelab-apps` Application are stored but ignored.
+The configuration lives in homelab-infra's
+[`k8s/argocd/notifications/argocd-notifications-cm.yml`](https://github.com/spicyhek/homelab-infra/blob/main/k8s/argocd/notifications/argocd-notifications-cm.yml),
+synced by the `argocd-notifications` Application. In short:
+
+- The `mybuilds` webhook service posts to the cluster-internal Service
+  (`http://mybuilds.default.svc.cluster.local/hooks/argocd`), so a tunnel
+  outage cannot drop deploy evidence. Its bearer token is the
+  `mybuilds-argocd-token` key of `argocd-notifications-secret`, the same value
+  as `MYBUILDS_ARGOCD_TOKEN`.
+- Four triggers, `mybuilds-on-sync-running`, `-on-sync-succeeded`,
+  `-on-sync-failed` and `-on-health-degraded`, each send the template of the
+  same name. Argo CD templates do not know which trigger fired, so each
+  template writes its own `trigger` value. The `mybuilds-` prefix keeps an
+  Application subscribed to another service from receiving these bodies.
+- Sync triggers fire once per revision (`oncePer`), so self-heal re-syncs of
+  the same commit are not resent.
+- An Application subscribes with one annotation per trigger:
+  `notifications.argoproj.io/subscribe.mybuilds-on-sync-succeeded.mybuilds: ""`
+  and so on.
+
+Only the service's own Application counts as evidence; syncs of the same
+commit by the root `homelab-apps` Application are stored but ignored. The sync
+template, abridged:
 
 ```yaml
-service.webhook.mybuilds: |
-  url: https://mybuilds.brendanmanley.com/hooks/argocd
-  headers:
-    - name: Content-Type
-      value: application/json
-    - name: Authorization
-      value: Bearer $mybuilds-argocd-token
-
 template.mybuilds-on-sync-succeeded: |
   webhook:
     mybuilds:
       method: POST
       body: |
+        {{- $op := .app.status.operationState -}}
+        {{- $rev := $op.operation.sync.revision -}}
+        {{- with $op.syncResult }}{{ $rev = .revision }}{{ end -}}
         {
           "trigger": "on-sync-succeeded",
           "application": "{{.app.metadata.name}}",
-          "revision": "{{.app.status.sync.revision}}",
+          "revision": "{{$rev}}",
           "sync_status": "{{.app.status.sync.status}}",
           "health_status": "{{.app.status.health.status}}",
-          "operation_phase": "{{.app.status.operationState.phase}}",
-          "started_at": "{{.app.status.operationState.startedAt}}",
-          "finished_at": "{{.app.status.operationState.finishedAt}}",
-          "commit_message": {{toJson (call .repo.GetCommitMetadata .app.status.sync.revision).Message}},
-          "commit_author": {{toJson (call .repo.GetCommitMetadata .app.status.sync.revision).Author}}
+          "operation_phase": "{{$op.phase}}",
+          "started_at": "{{$op.startedAt}}",
+          "finished_at": "{{$op.finishedAt}}",
+          "commit_message": {{toJson (call .repo.GetCommitMetadata $rev).Message}},
+          "commit_author": {{toJson (call .repo.GetCommitMetadata $rev).Author}}
         }
 ```
 
-`template.mybuilds-on-sync-running`, `-on-sync-failed` and
-`-on-health-degraded` are the same with their trigger name. The Application
-subscribes with annotations such as
-`notifications.argoproj.io/subscribe.on-sync-succeeded.mybuilds: ""`, with
-triggers whose `send` lists the matching template.
+The revision is the resolved commit from `syncResult` once the sync has one,
+and the operation's target revision before that. The health template sends
+`.app.status.sync.revision` and no operation fields.
 
 The payload fields:
 
