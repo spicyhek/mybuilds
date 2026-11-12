@@ -5,6 +5,7 @@ import { CopyIcon } from "./Icons";
 /** The identity sidebar: commit, artifact, GitOps commit, Argo CD revision. */
 export function ReleaseDetails({ release: r }: { release: Release }) {
   const reconcile = r.stages.find((s) => s.key === "reconcile");
+  const rollout = r.stages.find((s) => s.key === "rollout");
   return (
     <>
       <Field k="Release" v={r.release_id} mono copy />
@@ -36,7 +37,11 @@ export function ReleaseDetails({ release: r }: { release: Release }) {
         v={reconcile && reconcile.state !== "pending" ? reconcile.summary ?? reconcile.failure_reason ?? reconcile.state : undefined}
         awaiting="awaiting sync"
       />
-      <Field k="Rollout" v={undefined} awaiting="runtime watch arrives in M2" />
+      <Field
+        k="Rollout"
+        v={rollout && rollout.state !== "pending" ? rollout.summary ?? rollout.failure_reason ?? rollout.state : undefined}
+        awaiting="awaiting rollout"
+      />
       <Field k="Verification" v={undefined} awaiting="verifier arrives in M2" />
     </>
   );

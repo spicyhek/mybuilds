@@ -65,6 +65,7 @@ export interface Service {
   gitops_repository?: string;
   gitops_path?: string;
   argocd_application?: string;
+  workload?: { namespace: string; deployment: string };
 }
 
 export interface Meta {

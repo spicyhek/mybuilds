@@ -117,9 +117,10 @@ function whereRows(r: Release, st: Stage, svc?: Service): Row[] {
       push("Evidence", "Argo CD Notifications");
       break;
     case "rollout":
-      push("Namespace", "default", true);
-      push("Deployment", r.service, true);
-      push("Evidence", "Kubernetes watch (M2)");
+      push("Namespace", svc?.workload?.namespace, true);
+      push("Deployment", svc?.workload?.deployment, true);
+      push("Digest", r.artifact_digest ? shortDigest(r.artifact_digest) : undefined, true);
+      push("Evidence", "Read-only watch of the Deployment, ReplicaSets and pods");
       break;
     case "verify":
       push("Check", "GET /healthz, X-Release-ID", true);

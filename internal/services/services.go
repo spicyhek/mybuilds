@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -33,6 +34,29 @@ type Service struct {
 	GitOpsPath       string         `json:"gitops_path"`
 	Artifact         string         `json:"artifact"`
 	Jobs             map[string]Job `json:"jobs"`
+	// Workload is the Deployment the Rollout stage watches. Without it the
+	// service's releases stop at Reconcile.
+	Workload *Workload `json:"workload,omitempty"`
+}
+
+// Workload names a Deployment. The runtime watch only sees objects labeled
+// mybuilds.brendanmanley.com/managed=true.
+type Workload struct {
+	Namespace  string `json:"namespace"`
+	Deployment string `json:"deployment"`
+}
+
+// Key is the workload as namespace/name, the events table's workload key.
+func (w Workload) Key() string {
+	return w.Namespace + "/" + w.Deployment
+}
+
+// WorkloadKey returns the service's workload key, or "" without a workload.
+func (s Service) WorkloadKey() string {
+	if s.Workload == nil {
+		return ""
+	}
+	return s.Workload.Key()
 }
 
 // Job maps one workflow job's steps to pipeline stages.
@@ -89,6 +113,9 @@ func Parse(data []byte) (Map, error) {
 		case s.Environment == "" || s.Repository == "" || s.Workflow == "" || s.Branch == "":
 			return Map{}, fmt.Errorf("service %q: environment, repository, workflow and branch are required", s.Name)
 		}
+		if w := s.Workload; w != nil && (!namePattern.MatchString(w.Namespace) || !namePattern.MatchString(w.Deployment)) {
+			return Map{}, fmt.Errorf("service %q: workload needs a valid namespace and deployment", s.Name)
+		}
 		seen[s.Name] = true
 	}
 	return Map{services: doc.Services}, nil
@@ -107,6 +134,30 @@ func (m Map) ByName(name string) (Service, bool) {
 		}
 	}
 	return Service{}, false
+}
+
+// ByWorkload finds the service whose workload key is key.
+func (m Map) ByWorkload(key string) (Service, bool) {
+	for _, s := range m.services {
+		if key != "" && s.WorkloadKey() == key {
+			return s, true
+		}
+	}
+	return Service{}, false
+}
+
+// Namespaces returns the namespaces of every service's workload, sorted.
+func (m Map) Namespaces() []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, s := range m.services {
+		if s.Workload != nil && !seen[s.Workload.Namespace] {
+			seen[s.Workload.Namespace] = true
+			out = append(out, s.Workload.Namespace)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // ByWorkflow finds the service released by a repository's workflow file.
