@@ -138,7 +138,9 @@ function waitingOn(r: Release, st: Stage): string | null {
     case "reconcile":
       return r.gitops_sha ? `Waiting for Argo CD to pick up ${repoName(r.gitops_repository)}@${shortSha(r.gitops_sha)}` : null;
     case "rollout":
-      return "Rollout tracking arrives with the runtime watch (M2)";
+      return r.stages.find((s) => s.key === "reconcile")?.state === "succeeded"
+        ? `Waiting for ${r.service} pods to roll out`
+        : null;
     case "verify":
       return "Verification arrives with the verifier (M2)";
     case "build":

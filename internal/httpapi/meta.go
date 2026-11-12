@@ -26,6 +26,13 @@ type serviceView struct {
 	GitOpsRepository  string `json:"gitops_repository,omitempty"`
 	GitOpsPath        string `json:"gitops_path,omitempty"`
 	ArgoCDApplication string `json:"argocd_application,omitempty"`
+	// Workload is the Deployment the Rollout stage watches.
+	Workload *workloadView `json:"workload,omitempty"`
+}
+
+type workloadView struct {
+	Namespace  string `json:"namespace"`
+	Deployment string `json:"deployment"`
 }
 
 func (s *server) meta(w http.ResponseWriter, _ *http.Request) {
@@ -37,7 +44,12 @@ func (s *server) meta(w http.ResponseWriter, _ *http.Request) {
 }
 
 func toServiceView(svc services.Service) serviceView {
+	var workload *workloadView
+	if w := svc.Workload; w != nil {
+		workload = &workloadView{Namespace: w.Namespace, Deployment: w.Deployment}
+	}
 	return serviceView{
+		Workload:          workload,
 		Name:              svc.Name,
 		Environment:       svc.Environment,
 		Repository:        svc.Repository,

@@ -16,6 +16,9 @@ const (
 	ProviderGitHub = "github"
 	ProviderCI     = "ci"
 	ProviderArgoCD = "argocd"
+	// ProviderKubernetes is the runtime watch, not a webhook (plan section
+	// 8.4).
+	ProviderKubernetes = "kubernetes"
 )
 
 // Event types.
@@ -26,6 +29,9 @@ const (
 	TypeGitOpsUpdated    = "ci.gitops.updated"
 	TypeGitOpsSuperseded = "ci.gitops.superseded"
 	TypeArgoCD           = "argocd.notification"
+	TypeDeployment       = "k8s.deployment"
+	TypeReplicaSet       = "k8s.replicaset"
+	TypePod              = "k8s.pod"
 )
 
 // Event is one stored observation.
@@ -55,6 +61,10 @@ type Keys struct {
 	// Revision is a GitOps commit SHA. It links Argo CD syncs to the release
 	// whose gitops.updated event reported that commit.
 	Revision string
+	// Workload is the Deployment a runtime event describes, as
+	// namespace/name. The projector reads a workload's events between the
+	// Argo CD sync of a release's GitOps commit and the next sync.
+	Workload string
 }
 
 // Decode unmarshals the payload into v.
@@ -185,4 +195,90 @@ type ArgoCDNotification struct {
 	CommitSubject   string `json:"commit_subject,omitempty"`
 	CommitReleaseID string `json:"commit_release_id,omitempty"`
 	CommitAuthor    string `json:"commit_author,omitempty"`
+}
+
+// Kubernetes runtime payloads (plan section 8.4). Each is a snapshot of the
+// fields the Rollout stage needs. Node names, pod IPs, environment, volumes
+// and container messages are never copied.
+
+// Deployment is a snapshot of a managed Deployment.
+type Deployment struct {
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
+	UID       string `json:"uid"`
+	// Revision is the deployment.kubernetes.io/revision annotation: the
+	// revision of its newest ReplicaSet.
+	Revision           string `json:"revision,omitempty"`
+	Generation         int64  `json:"generation"`
+	ObservedGeneration int64  `json:"observed_generation"`
+	// Replicas is the desired count; the others are from status.
+	Replicas            int32       `json:"replicas"`
+	StatusReplicas      int32       `json:"status_replicas"`
+	UpdatedReplicas     int32       `json:"updated_replicas"`
+	ReadyReplicas       int32       `json:"ready_replicas"`
+	AvailableReplicas   int32       `json:"available_replicas"`
+	UnavailableReplicas int32       `json:"unavailable_replicas"`
+	Images              []string    `json:"images,omitempty"`
+	ReleaseID           string      `json:"release_id,omitempty"`
+	Conditions          []Condition `json:"conditions,omitempty"`
+	Deleted             bool        `json:"deleted,omitempty"`
+}
+
+// Condition is a Deployment condition without its free-text message.
+type Condition struct {
+	Type               string     `json:"type"`
+	Status             string     `json:"status"`
+	Reason             string     `json:"reason,omitempty"`
+	LastUpdateTime     *time.Time `json:"last_update_time,omitempty"`
+	LastTransitionTime *time.Time `json:"last_transition_time,omitempty"`
+}
+
+// ReplicaSet is a snapshot of a ReplicaSet owned by a managed Deployment.
+type ReplicaSet struct {
+	Namespace         string    `json:"namespace"`
+	Name              string    `json:"name"`
+	UID               string    `json:"uid"`
+	Deployment        string    `json:"deployment"`
+	Revision          string    `json:"revision,omitempty"`
+	PodTemplateHash   string    `json:"pod_template_hash,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+	Replicas          int32     `json:"replicas"`
+	StatusReplicas    int32     `json:"status_replicas"`
+	ReadyReplicas     int32     `json:"ready_replicas"`
+	AvailableReplicas int32     `json:"available_replicas"`
+	Images            []string  `json:"images,omitempty"`
+	ReleaseID         string    `json:"release_id,omitempty"`
+	Deleted           bool      `json:"deleted,omitempty"`
+}
+
+// Pod is a snapshot of a pod of a managed Deployment.
+type Pod struct {
+	Namespace       string    `json:"namespace"`
+	Name            string    `json:"name"`
+	UID             string    `json:"uid"`
+	ReplicaSet      string    `json:"replica_set,omitempty"`
+	PodTemplateHash string    `json:"pod_template_hash,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	Phase           string    `json:"phase,omitempty"`
+	Ready           bool      `json:"ready"`
+	// ReadyChangedAt is the last transition of the Ready condition.
+	ReadyChangedAt *time.Time        `json:"ready_changed_at,omitempty"`
+	Containers     []ContainerStatus `json:"containers,omitempty"`
+	Deleted        bool              `json:"deleted,omitempty"`
+}
+
+// ContainerStatus is one container of a pod.
+type ContainerStatus struct {
+	Name string `json:"name"`
+	// Image is the image reference from the pod spec; ImageDigest is the
+	// sha256 digest the kubelet reports in imageID.
+	Image        string `json:"image"`
+	ImageDigest  string `json:"image_digest,omitempty"`
+	Ready        bool   `json:"ready"`
+	RestartCount int32  `json:"restart_count"`
+	// State is waiting, running or terminated; Reason is its reason, such as
+	// ContainerCreating, ImagePullBackOff or CrashLoopBackOff.
+	State     string     `json:"state,omitempty"`
+	Reason    string     `json:"reason,omitempty"`
+	StartedAt *time.Time `json:"started_at,omitempty"`
 }

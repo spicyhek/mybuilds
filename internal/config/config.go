@@ -29,6 +29,9 @@ type Config struct {
 	GitHubWebhookSecret string
 	CIEventSecret       string
 	ArgoCDToken         string
+	// RuntimeWatch is "auto", which starts the Kubernetes watch when running
+	// in a cluster, or "off".
+	RuntimeWatch string
 }
 
 // String hides the secrets, so a logged Config never leaks them.
@@ -56,6 +59,10 @@ func FromEnv() (Config, error) {
 		GitHubWebhookSecret: os.Getenv("MYBUILDS_GITHUB_WEBHOOK_SECRET"),
 		CIEventSecret:       os.Getenv("MYBUILDS_CI_EVENT_SECRET"),
 		ArgoCDToken:         os.Getenv("MYBUILDS_ARGOCD_TOKEN"),
+		RuntimeWatch:        envOr("MYBUILDS_RUNTIME_WATCH", "auto"),
+	}
+	if cfg.RuntimeWatch != "auto" && cfg.RuntimeWatch != "off" {
+		return cfg, fmt.Errorf("MYBUILDS_RUNTIME_WATCH: %q is not auto or off", cfg.RuntimeWatch)
 	}
 
 	fixtures, err := envBool("MYBUILDS_FIXTURES", false)

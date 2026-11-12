@@ -16,7 +16,8 @@
           "from_step": [{ "step": "Push image", "stage": "publish" }]
         },
         "bump-gitops": { "stage": "gitops" }
-      }
+      },
+      "workload": { "namespace": "default", "deployment": "personal-site" }
     }
   ]
 }

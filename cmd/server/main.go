@@ -17,11 +17,13 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"k8s.io/client-go/rest"
 
 	"github.com/spicyhek/mybuilds/internal/config"
 	"github.com/spicyhek/mybuilds/internal/fixtures"
 	"github.com/spicyhek/mybuilds/internal/httpapi"
 	"github.com/spicyhek/mybuilds/internal/ingest"
+	"github.com/spicyhek/mybuilds/internal/kube"
 	"github.com/spicyhek/mybuilds/internal/releases"
 	"github.com/spicyhek/mybuilds/internal/services"
 	"github.com/spicyhek/mybuilds/internal/storage"
@@ -115,6 +117,8 @@ func run() error {
 		"ci", cfg.CIEventSecret != "",
 		"argocd", cfg.ArgoCDToken != "")
 
+	startRuntimeWatch(ctx, cfg, logger, svcs, store, projector, hub)
+
 	if cfg.Fixtures {
 		go func() {
 			if _, err := store.GetRelease(ctx, fixtures.RecordedRelease); err == nil {
@@ -192,6 +196,41 @@ func run() error {
 		}
 	}
 	return shutdownErr
+}
+
+// startRuntimeWatch starts the Kubernetes watch for the Rollout stage when
+// running in a cluster (plan section 8.4). Outside one, or in fixture mode,
+// releases stop at Reconcile.
+func startRuntimeWatch(ctx context.Context, cfg config.Config, logger *slog.Logger, svcs services.Map,
+	store *storage.Store, projector *releases.Projector, hub *httpapi.Hub) {
+	if cfg.RuntimeWatch == "off" || cfg.Fixtures {
+		logger.Info("runtime watch disabled", "setting", cfg.RuntimeWatch, "fixtures", cfg.Fixtures)
+		return
+	}
+	restConfig, err := rest.InClusterConfig()
+	if err != nil {
+		logger.Info("runtime watch disabled: not running in a cluster", "reason", err.Error())
+		return
+	}
+	restConfig.UserAgent = "mybuilds/" + version
+	watcher, err := kube.New(kube.Options{
+		Config:     restConfig,
+		Services:   svcs,
+		Store:      store,
+		Projector:  projector,
+		Notify:     hub.Notify,
+		Logger:     logger,
+		Registerer: prometheus.DefaultRegisterer,
+	})
+	if err != nil {
+		logger.Error("runtime watch disabled", "error", err)
+		return
+	}
+	go func() {
+		if err := watcher.Run(ctx); err != nil {
+			logger.Error("runtime watch stopped", "error", err)
+		}
+	}()
 }
 
 func randomSecret() string {

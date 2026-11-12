@@ -25,9 +25,16 @@ type Projection struct {
 // ID, never by arrival, so the same events always give the same result and
 // replaying duplicates changes nothing (plan sections 5.4 and 13).
 //
-// It covers the application template from Source through Reconcile. Rollout
-// and Verify stay pending until the runtime watch and the verifier exist.
+// It covers the application template from Source through Reconcile; see
+// ProjectWithRuntime for Rollout. Verify stays pending until the verifier
+// exists.
 func Project(releaseID string, evs []events.Event, svc services.Service) (Projection, error) {
+	return ProjectWithRuntime(releaseID, evs, svc, nil)
+}
+
+// ProjectWithRuntime is Project with the release's runtime window, which
+// adds the Rollout stage. A nil runtime leaves Rollout pending.
+func ProjectWithRuntime(releaseID string, evs []events.Event, svc services.Service, rt *Runtime) (Projection, error) {
 	parts, err := ParseReleaseID(releaseID)
 	if err != nil {
 		return Projection{}, err
@@ -42,9 +49,10 @@ func Project(releaseID string, evs []events.Event, svc services.Service) (Projec
 	})
 
 	f := &fold{
-		svc:  svc,
-		runs: map[int]*runObs{},
-		jobs: map[jobKey]*jobObs{},
+		svc:     svc,
+		runtime: rt,
+		runs:    map[int]*runObs{},
+		jobs:    map[jobKey]*jobObs{},
 	}
 	f.release = Release{
 		ReleaseID:   releaseID,
@@ -91,6 +99,7 @@ type argoObs struct {
 
 type fold struct {
 	svc     services.Service
+	runtime *Runtime
 	release Release
 
 	eventIDs []int64
@@ -425,6 +434,11 @@ func (f *fold) result() Projection {
 		}
 	} else if r.GitOpsSHA != "" {
 		steps = append(steps, f.reconcile(reconcile, r.GitOpsSHA)...)
+		// Rollout: the workload between this sync and the next (plan
+		// section 8.4). A failed sync applied nothing to roll out.
+		if f.runtime != nil && reconcile.State != StateFailed {
+			steps = append(steps, f.rollout(stages["rollout"], r, f.runtime)...)
+		}
 	}
 
 	settle(r.Stages)

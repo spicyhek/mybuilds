@@ -11,7 +11,7 @@ import (
 )
 
 const eventColumns = `id, provider, provider_delivery_id, type, attempt, occurred_at, received_at,
-	body_sha256, release_key, run_id, revision, payload`
+	body_sha256, release_key, run_id, revision, workload, payload`
 
 // InsertEvent stores an event. A delivery already stored for the same
 // provider is dropped and false is returned (plan section 13). On success
@@ -27,11 +27,12 @@ func (s *Store) InsertEvent(ctx context.Context, e *events.Event) (inserted bool
 	}
 	res, err := s.db.ExecContext(ctx, `
 		INSERT INTO events (provider, provider_delivery_id, type, attempt, occurred_at, received_at,
-			body_sha256, release_key, run_id, revision, payload)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			body_sha256, release_key, run_id, revision, workload, payload)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (provider, provider_delivery_id) DO NOTHING`,
 		e.Provider, e.DeliveryID, e.Type, attempt, formatTime(e.OccurredAt), formatTime(e.ReceivedAt),
-		e.BodySHA256, nullString(e.Keys.ReleaseID), runID, nullString(e.Keys.Revision), string(e.Payload),
+		e.BodySHA256, nullString(e.Keys.ReleaseID), runID, nullString(e.Keys.Revision), nullString(e.Keys.Workload),
+		string(e.Payload),
 	)
 	if err != nil {
 		return false, fmt.Errorf("insert event %s/%s: %w", e.Provider, e.DeliveryID, err)
@@ -151,10 +152,10 @@ func (s *Store) CountEvents(ctx context.Context) (total, uncorrelated int, err e
 func scanEvent(sc rowScanner) (events.Event, error) {
 	var e events.Event
 	var occurredAt, receivedAt, payload string
-	var releaseKey, revision sql.NullString
+	var releaseKey, revision, workload sql.NullString
 	var runID sql.NullInt64
 	if err := sc.Scan(&e.ID, &e.Provider, &e.DeliveryID, &e.Type, &e.Attempt, &occurredAt, &receivedAt,
-		&e.BodySHA256, &releaseKey, &runID, &revision, &payload); err != nil {
+		&e.BodySHA256, &releaseKey, &runID, &revision, &workload, &payload); err != nil {
 		return e, fmt.Errorf("scan event: %w", err)
 	}
 	var err error
@@ -164,7 +165,7 @@ func scanEvent(sc rowScanner) (events.Event, error) {
 	if e.ReceivedAt, err = parseTime(receivedAt); err != nil {
 		return e, err
 	}
-	e.Keys = events.Keys{ReleaseID: releaseKey.String, RunID: runID.Int64, Revision: revision.String}
+	e.Keys = events.Keys{ReleaseID: releaseKey.String, RunID: runID.Int64, Revision: revision.String, Workload: workload.String}
 	e.Payload = []byte(payload)
 	return e, nil
 }
