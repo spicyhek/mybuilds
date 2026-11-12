@@ -7,6 +7,9 @@
       "workflow": ".github/workflows/release.yml",
       "branch": "main",
       "argocd_application": "personal-site",
+      "gitops_repository": "spicyhek/homelab-infra",
+      "gitops_path": "k8s/apps/personal-site",
+      "artifact": "ghcr.io/spicyhek/homelab-hosted-personal-site",
       "jobs": {
         "build": {
           "stage": "build",

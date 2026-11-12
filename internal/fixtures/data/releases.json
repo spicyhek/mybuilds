@@ -1,31 +1,5 @@
 [
   {
-    "release_id": "personal-site/ce61154/production/11",
-    "service": "personal-site",
-    "environment": "production",
-    "kind": "application",
-    "template": "application",
-    "source_repository": "spicyhek/homelab-hosted-personal-site",
-    "source_sha": "ce61154e05756b0a7e40311de30dccaa0273f305",
-    "artifact": "ghcr.io/spicyhek/homelab-hosted-personal-site",
-    "artifact_digest": "sha256:9785af09091041a492b423d2aa88d98df1f980b5a056c055590d4b889bf092a5",
-    "gitops_repository": "spicyhek/homelab-infra",
-    "gitops_sha": "f8c9de901999c2984662a926a18e31a531fd7821",
-    "status": "succeeded",
-    "created_at": "2026-11-08T11:25:50Z",
-    "completed_at": "2026-11-08T11:31:40Z",
-    "verified_at": "2026-11-08T11:31:40Z",
-    "stages": [
-      { "key": "source", "state": "succeeded", "started_at": "2026-11-08T11:25:50Z", "completed_at": "2026-11-08T11:25:51Z", "summary": "Push to main" },
-      { "key": "build", "state": "succeeded", "started_at": "2026-11-08T11:25:51Z", "completed_at": "2026-11-08T11:26:33Z", "summary": "Build image, smoke test" },
-      { "key": "publish", "state": "succeeded", "started_at": "2026-11-08T11:26:33Z", "completed_at": "2026-11-08T11:26:41Z", "summary": "Pushed sha256:9785af09…bf092a5" },
-      { "key": "gitops", "state": "succeeded", "started_at": "2026-11-08T11:26:44Z", "completed_at": "2026-11-08T11:27:25Z", "summary": "homelab-infra#57 squash-merged as f8c9de9" },
-      { "key": "reconcile", "state": "succeeded", "started_at": "2026-11-08T11:27:25Z", "completed_at": "2026-11-08T11:28:12Z", "summary": "Argo CD synced f8c9de9" },
-      { "key": "rollout", "state": "succeeded", "started_at": "2026-11-08T11:28:12Z", "completed_at": "2026-11-08T11:29:05Z", "summary": "3 of 3 pods Ready with the release digest" },
-      { "key": "verify", "state": "succeeded", "started_at": "2026-11-08T11:29:05Z", "completed_at": "2026-11-08T11:31:40Z", "summary": "5 of 5 checks passed, X-Release-ID matched" }
-    ]
-  },
-  {
     "release_id": "personal-site/config/5bb4095/production",
     "service": "personal-site",
     "environment": "production",
@@ -38,10 +12,34 @@
     "completed_at": "2026-11-07T23:15:48Z",
     "verified_at": "2026-11-07T23:15:48Z",
     "stages": [
-      { "key": "gitops_commit", "state": "succeeded", "started_at": "2026-11-07T23:10:12Z", "completed_at": "2026-11-07T23:10:12Z", "summary": "Early prep for mybuilds: pin digest for personal site (#56)" },
-      { "key": "reconcile", "state": "succeeded", "started_at": "2026-11-07T23:10:40Z", "completed_at": "2026-11-07T23:11:31Z", "summary": "Argo CD synced 5bb4095" },
-      { "key": "rollout", "state": "succeeded", "started_at": "2026-11-07T23:11:31Z", "completed_at": "2026-11-07T23:12:58Z", "summary": "3 of 3 pods Ready" },
-      { "key": "verify", "state": "succeeded", "started_at": "2026-11-07T23:12:58Z", "completed_at": "2026-11-07T23:15:48Z", "summary": "5 of 5 checks passed" }
+      {
+        "key": "gitops_commit",
+        "state": "succeeded",
+        "started_at": "2026-11-07T23:10:12Z",
+        "completed_at": "2026-11-07T23:10:12Z",
+        "summary": "Early prep for mybuilds: pin digest for personal site (#56)"
+      },
+      {
+        "key": "reconcile",
+        "state": "succeeded",
+        "started_at": "2026-11-07T23:10:40Z",
+        "completed_at": "2026-11-07T23:11:31Z",
+        "summary": "Argo CD synced 5bb4095"
+      },
+      {
+        "key": "rollout",
+        "state": "succeeded",
+        "started_at": "2026-11-07T23:11:31Z",
+        "completed_at": "2026-11-07T23:12:58Z",
+        "summary": "3 of 3 pods Ready"
+      },
+      {
+        "key": "verify",
+        "state": "succeeded",
+        "started_at": "2026-11-07T23:12:58Z",
+        "completed_at": "2026-11-07T23:15:48Z",
+        "summary": "5 of 5 checks passed"
+      }
     ]
   },
   {
@@ -62,13 +60,56 @@
     "created_at": "2026-11-12T18:00:00Z",
     "completed_at": "2026-11-12T18:06:30Z",
     "stages": [
-      { "key": "source", "state": "succeeded", "started_at": "2026-11-12T18:00:00Z", "completed_at": "2026-11-12T18:00:01Z", "summary": "workflow_dispatch: scenario unhealthy" },
-      { "key": "build", "state": "succeeded", "started_at": "2026-11-12T18:00:01Z", "completed_at": "2026-11-12T18:00:39Z", "summary": "Build image" },
-      { "key": "publish", "state": "succeeded", "started_at": "2026-11-12T18:00:39Z", "completed_at": "2026-11-12T18:00:46Z", "summary": "Pushed sha256:0000000…0000d41" },
-      { "key": "gitops", "state": "succeeded", "started_at": "2026-11-12T18:00:48Z", "completed_at": "2026-11-12T18:01:20Z", "summary": "drill: unhealthy squash-merged" },
-      { "key": "reconcile", "state": "succeeded", "started_at": "2026-11-12T18:01:20Z", "completed_at": "2026-11-12T18:02:05Z", "summary": "Argo CD synced" },
-      { "key": "rollout", "state": "succeeded", "started_at": "2026-11-12T18:02:05Z", "completed_at": "2026-11-12T18:02:41Z", "summary": "1 of 1 pods Ready with the release digest" },
-      { "key": "verify", "state": "failed", "started_at": "2026-11-12T18:02:41Z", "completed_at": "2026-11-12T18:06:30Z", "summary": "/healthz 500 on 5 of 5 checks", "failure_reason": "Ready is not the same as healthy: readiness passed, /healthz returned 500" }
+      {
+        "key": "source",
+        "state": "succeeded",
+        "started_at": "2026-11-12T18:00:00Z",
+        "completed_at": "2026-11-12T18:00:01Z",
+        "summary": "workflow_dispatch: scenario unhealthy"
+      },
+      {
+        "key": "build",
+        "state": "succeeded",
+        "started_at": "2026-11-12T18:00:01Z",
+        "completed_at": "2026-11-12T18:00:39Z",
+        "summary": "Build image"
+      },
+      {
+        "key": "publish",
+        "state": "succeeded",
+        "started_at": "2026-11-12T18:00:39Z",
+        "completed_at": "2026-11-12T18:00:46Z",
+        "summary": "Pushed sha256:0000000\u20260000d41"
+      },
+      {
+        "key": "gitops",
+        "state": "succeeded",
+        "started_at": "2026-11-12T18:00:48Z",
+        "completed_at": "2026-11-12T18:01:20Z",
+        "summary": "drill: unhealthy squash-merged"
+      },
+      {
+        "key": "reconcile",
+        "state": "succeeded",
+        "started_at": "2026-11-12T18:01:20Z",
+        "completed_at": "2026-11-12T18:02:05Z",
+        "summary": "Argo CD synced"
+      },
+      {
+        "key": "rollout",
+        "state": "succeeded",
+        "started_at": "2026-11-12T18:02:05Z",
+        "completed_at": "2026-11-12T18:02:41Z",
+        "summary": "1 of 1 pods Ready with the release digest"
+      },
+      {
+        "key": "verify",
+        "state": "failed",
+        "started_at": "2026-11-12T18:02:41Z",
+        "completed_at": "2026-11-12T18:06:30Z",
+        "summary": "/healthz 500 on 5 of 5 checks",
+        "failure_reason": "Ready is not the same as healthy: readiness passed, /healthz returned 500"
+      }
     ]
   }
 ]

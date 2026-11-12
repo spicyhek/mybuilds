@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"github.com/spicyhek/mybuilds/internal/events"
+	"github.com/spicyhek/mybuilds/internal/fixtures"
 	"github.com/spicyhek/mybuilds/internal/ingest"
 	"github.com/spicyhek/mybuilds/internal/ingest/verify"
 	"github.com/spicyhek/mybuilds/internal/releases"
@@ -65,39 +65,15 @@ func newEnv(t *testing.T, secrets ingest.Secrets) *env {
 
 var allSecrets = ingest.Secrets{GitHubWebhook: githubSecret, CIEvents: ciSecret, ArgoCDToken: argoToken}
 
-type delivery struct {
-	Name     string
-	Provider string            `json:"provider"`
-	Headers  map[string]string `json:"headers"`
-	Body     json.RawMessage   `json:"body"`
-}
+type delivery = fixtures.Delivery
 
-func loadDeliveries(t *testing.T, dir string) []delivery {
+func loadDeliveries(t *testing.T, name string) []delivery {
 	t.Helper()
-	paths, err := filepath.Glob(filepath.Join("testdata", dir, "*.json"))
-	if err != nil || len(paths) == 0 {
-		t.Fatalf("no deliveries in %s: %v", dir, err)
+	ds, err := fixtures.Deliveries(name)
+	if err != nil || len(ds) == 0 {
+		t.Fatalf("recorded deliveries %s: %v", name, err)
 	}
-	slices.Sort(paths)
-	var out []delivery
-	for _, p := range paths {
-		data, err := os.ReadFile(p)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var d delivery
-		if err := json.Unmarshal(data, &d); err != nil {
-			t.Fatalf("%s: %v", p, err)
-		}
-		d.Name = strings.TrimSuffix(filepath.Base(p), ".json")
-		var compact bytes.Buffer
-		if err := json.Compact(&compact, d.Body); err != nil {
-			t.Fatal(err)
-		}
-		d.Body = compact.Bytes()
-		out = append(out, d)
-	}
-	return out
+	return ds
 }
 
 var paths = map[string]string{

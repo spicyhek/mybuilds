@@ -24,6 +24,7 @@ import (
 	"github.com/spicyhek/mybuilds/internal/ingest/ci"
 	"github.com/spicyhek/mybuilds/internal/ingest/github"
 	"github.com/spicyhek/mybuilds/internal/ingest/verify"
+	"github.com/spicyhek/mybuilds/internal/releases"
 	"github.com/spicyhek/mybuilds/internal/services"
 )
 
@@ -44,7 +45,7 @@ type Store interface {
 
 // Projector re-projects the releases an event touches.
 type Projector interface {
-	ProjectEvent(ctx context.Context, e events.Event) ([]string, error)
+	ProjectEvent(ctx context.Context, e events.Event) ([]releases.Outcome, error)
 }
 
 // Options configures an Ingester.
@@ -58,6 +59,9 @@ type Options struct {
 	Registerer prometheus.Registerer
 	// Now is the clock for received_at; time.Now when nil.
 	Now func() time.Time
+	// Notify is called after an event is stored and its releases
+	// re-projected. The SSE stream hangs off it.
+	Notify func(ctx context.Context, eventID int64, outcomes []releases.Outcome)
 }
 
 // Ingester authenticates, translates and stores provider events.
@@ -68,6 +72,7 @@ type Ingester struct {
 	secrets   Secrets
 	logger    *slog.Logger
 	now       func() time.Time
+	notify    func(context.Context, int64, []releases.Outcome)
 
 	results          *prometheus.CounterVec
 	projectionErrors prometheus.Counter
@@ -82,6 +87,7 @@ func New(o Options) *Ingester {
 		secrets:   o.Secrets,
 		logger:    o.Logger,
 		now:       o.Now,
+		notify:    o.Notify,
 		results: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "mybuilds_ingest_requests_total",
 			Help: "Ingestion requests by provider and result.",
@@ -207,11 +213,16 @@ func (in *Ingester) Ingest(ctx context.Context, provider string, header http.Hea
 
 	res = Result{Outcome: OutcomeStored, Type: ev.Type, EventID: ev.ID}
 	if in.projector != nil {
-		ids, perr := in.projector.ProjectEvent(ctx, *ev)
-		res.Releases = ids
+		outcomes, perr := in.projector.ProjectEvent(ctx, *ev)
+		for _, o := range outcomes {
+			res.Releases = append(res.Releases, o.ReleaseID)
+		}
 		if perr != nil {
 			in.projectionErrors.Inc()
 			in.logger.Error("projection failed", "event_id", ev.ID, "type", ev.Type, "error", perr)
+		}
+		if in.notify != nil && len(outcomes) > 0 {
+			in.notify(ctx, ev.ID, outcomes)
 		}
 	}
 	in.logger.Info("event stored", "provider", provider, "type", ev.Type, "event_id", ev.ID,

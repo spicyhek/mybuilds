@@ -1,8 +1,10 @@
-// Package web embeds the built frontend into the server binary.
+// Package web holds the React frontend and embeds its build output into the
+// server binary.
 //
-// dist/ currently holds a placeholder page that lists releases from the API.
-// The React pipeline UI replaces it; demo/index.html at the repository root
-// is the standalone prototype it is built from.
+// dist/ is produced by `npm run build` in this directory and is not checked
+// in. Without a build the directory holds only .gitkeep (the all: prefix
+// embeds dotfiles so the embed still compiles), and the server answers
+// every page with 404.
 package web
 
 import (
@@ -10,7 +12,7 @@ import (
 	"io/fs"
 )
 
-//go:embed dist
+//go:embed all:dist
 var dist embed.FS
 
 // Dist returns the frontend files rooted at dist/.

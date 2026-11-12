@@ -7,3 +7,4 @@ data
 *.db-wal
 *.db-shm
 *.md
+web/node_modules

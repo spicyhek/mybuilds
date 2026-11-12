@@ -4,6 +4,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -82,22 +84,53 @@ func run() error {
 	}
 	logger.Info("projections rebuilt", "releases", rebuilt, "services", len(svcs.Services()))
 
+	secrets := ingest.Secrets{
+		GitHubWebhook: cfg.GitHubWebhookSecret,
+		CIEvents:      cfg.CIEventSecret,
+		ArgoCDToken:   cfg.ArgoCDToken,
+	}
+	if cfg.Fixtures {
+		// The simulated stream goes through the same signed path as real
+		// events. Endpoints left unconfigured get a random secret that
+		// nothing else knows, so they stay closed to outside callers.
+		for _, s := range []*string{&secrets.GitHubWebhook, &secrets.CIEvents, &secrets.ArgoCDToken} {
+			if *s == "" {
+				*s = randomSecret()
+			}
+		}
+	}
+
+	hub := httpapi.NewHub(store, logger)
 	ingester := ingest.New(ingest.Options{
-		Store:     store,
-		Projector: projector,
-		Services:  svcs,
-		Secrets: ingest.Secrets{
-			GitHubWebhook: cfg.GitHubWebhookSecret,
-			CIEvents:      cfg.CIEventSecret,
-			ArgoCDToken:   cfg.ArgoCDToken,
-		},
+		Store:      store,
+		Projector:  projector,
+		Services:   svcs,
+		Secrets:    secrets,
 		Logger:     logger,
 		Registerer: prometheus.DefaultRegisterer,
+		Notify:     hub.Notify,
 	})
 	logger.Info("ingestion",
 		"github", cfg.GitHubWebhookSecret != "",
 		"ci", cfg.CIEventSecret != "",
 		"argocd", cfg.ArgoCDToken != "")
+
+	if cfg.Fixtures {
+		go func() {
+			if _, err := store.GetRelease(ctx, fixtures.RecordedRelease); err == nil {
+				logger.Info("fixture replay skipped: recorded release already present", "release_id", fixtures.RecordedRelease)
+				return
+			}
+			err := fixtures.Replay(ctx, ingester, "personal-site-11", fixtures.ReplayOptions{
+				Secrets: secrets, Lead: 5 * time.Second, MaxGap: 20 * time.Second, Logger: logger,
+			})
+			if err != nil && !errors.Is(err, context.Canceled) {
+				logger.Error("fixture replay", "error", err)
+				return
+			}
+			logger.Info("fixture replay finished", "release_id", fixtures.RecordedRelease)
+		}()
+	}
 
 	dist, err := web.Dist()
 	if err != nil {
@@ -111,6 +144,9 @@ func run() error {
 		Metrics:   httpapi.NewMetrics(prometheus.DefaultRegisterer, version),
 		Logger:    logger,
 		Ingest:    ingester,
+		Hub:       hub,
+		Services:  svcs,
+		Fixtures:  cfg.Fixtures,
 		Web:       dist,
 	})
 
@@ -156,4 +192,12 @@ func run() error {
 		}
 	}
 	return shutdownErr
+}
+
+func randomSecret() string {
+	var b [32]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		panic(fmt.Sprintf("crypto/rand: %v", err))
+	}
+	return hex.EncodeToString(b[:])
 }

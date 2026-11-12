@@ -31,6 +31,21 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # Type-checks and builds the frontend; the Go tests do not need the
+      # output, but the image build does, and a broken build should fail here.
+      - name: Build frontend
+        working-directory: web
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
       - name: Check formatting
         run: |
           unformatted="$(gofmt -l .)"
@@ -47,8 +62,7 @@ jobs:
         run: go test -race -count=1 ./...
 
   # The job and step names below are what the mybuilds service map expects
-  # (plan section 8.1). A bump-gitops job is added together with the
-  # homelab-infra/k8s/apps/mybuilds manifests.
+  # (plan section 8.1): build, then bump-gitops.
   build:
     needs: test
     if: github.event_name == 'push'
@@ -117,7 +131,12 @@ jobs:
           curl --fail --silent --show-error --output /dev/null http://127.0.0.1:8080/readyz
           curl --fail --silent --show-error http://127.0.0.1:8080/api/v1/releases \
             | jq --exit-status '.releases | length > 0' > /dev/null
-          curl --fail --silent --show-error --output /dev/null http://127.0.0.1:8080/
+          curl --fail --silent --show-error http://127.0.0.1:8080/ \
+            | grep -q '<div id="root">'
+          # The stream never ends, so curl times out by design; only grep's
+          # verdict counts.
+          (curl --silent --no-buffer --max-time 3 http://127.0.0.1:8080/api/v1/stream || true) \
+            | grep -q '^event: hello'
 
           docker logs smoke
           docker rm --force smoke
@@ -150,4 +169,191 @@ jobs:
             echo "### mybuilds image published"
             echo "Release: \`${{ steps.release.outputs.id }}\`"
             echo "Image: \`${IMAGE_NAME}@${DIGEST}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+  # Promotes the image by pinning its digest in homelab-infra, the same way
+  # personal-site does: a pull request that is squash-merged at once, with a
+  # Release-Id trailer, and Argo CD syncs it. homelab-infra main requires a
+  # pull request, so this uses INFRA_REPO_TOKEN, a fine-grained token limited
+  # to homelab-infra with contents: write and pull-requests: write.
+  bump-gitops:
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    env:
+      DIGEST: ${{ needs.build.outputs.digest }}
+      RELEASE_ID: ${{ needs.build.outputs.release_id }}
+      INFRA_REPOSITORY: spicyhek/homelab-infra
+      GITOPS_PATH: k8s/apps/mybuilds
+
+    outputs:
+      gitops_sha: ${{ steps.merge.outputs.gitops_sha }}
+
+    steps:
+      - name: Check out app repository
+        uses: actions/checkout@v4
+
+      - name: Check for newer commit
+        id: latest
+        run: |
+          set -euo pipefail
+
+          LATEST_SHA="$(git -C "${GITHUB_WORKSPACE}" ls-remote origin refs/heads/main | cut -f1)"
+          if [ -z "${LATEST_SHA}" ]; then
+            echo "::error::Could not determine the current mybuilds main commit"
+            exit 1
+          fi
+
+          if [ "${LATEST_SHA}" != "${GITHUB_SHA}" ]; then
+            echo "Skipping superseded release ${GITHUB_SHA}; main is now ${LATEST_SHA}"
+            echo "superseded=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "superseded=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Until the manifests are merged there is nothing to promote, and the
+      # token is not needed yet. homelab-infra is public, so this check
+      # works without it.
+      - name: Check GitOps target
+        id: target
+        if: steps.latest.outputs.superseded == 'false'
+        run: |
+          set -euo pipefail
+
+          url="https://raw.githubusercontent.com/${INFRA_REPOSITORY}/main/${GITOPS_PATH}/kustomization.yml"
+          status="$(curl --silent --output /dev/null --write-out '%{http_code}' --retry 3 --retry-all-errors "${url}")"
+          case "${status}" in
+            200)
+              echo "present=true" >> "$GITHUB_OUTPUT"
+              ;;
+            404)
+              echo "::warning::${GITOPS_PATH} is not on ${INFRA_REPOSITORY} main yet; the image is published but not promoted"
+              echo "present=false" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::Could not check ${url}: HTTP ${status}"
+              exit 1
+              ;;
+          esac
+
+      - name: Check out infra repository
+        if: steps.target.outputs.present == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: spicyhek/homelab-infra
+          ref: main
+          token: ${{ secrets.INFRA_REPO_TOKEN }}
+          path: homelab-infra
+
+      - name: Pin image digest
+        if: steps.target.outputs.present == 'true'
+        working-directory: homelab-infra/k8s/apps/mybuilds
+        run: |
+          set -euo pipefail
+
+          sed -i -E "s#^([[:space:]]+)(newTag|digest): .*#\1digest: ${DIGEST}#" kustomization.yml
+          grep -qF "digest: ${DIGEST}" kustomization.yml
+
+          cat > release-patch.yml <<EOF
+          # Rewritten by the mybuilds release workflow on every promotion.
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: mybuilds
+            namespace: default
+            annotations:
+              mybuilds.brendanmanley.com/release-id: "${RELEASE_ID}"
+              mybuilds.brendanmanley.com/source-sha: "${GITHUB_SHA}"
+              mybuilds.brendanmanley.com/artifact-digest: "${DIGEST}"
+          spec:
+            template:
+              metadata:
+                annotations:
+                  mybuilds.brendanmanley.com/release-id: "${RELEASE_ID}"
+                  mybuilds.brendanmanley.com/source-sha: "${GITHUB_SHA}"
+                  mybuilds.brendanmanley.com/artifact-digest: "${DIGEST}"
+              spec:
+                containers:
+                  - name: mybuilds
+                    env:
+                      - name: RELEASE_ID
+                        value: "${RELEASE_ID}"
+          EOF
+
+      - name: Commit and open pull request
+        id: pr
+        if: steps.target.outputs.present == 'true'
+        working-directory: homelab-infra
+        env:
+          GH_TOKEN: ${{ secrets.INFRA_REPO_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          DEPLOY_BRANCH="deploy/mybuilds-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git checkout -b "${DEPLOY_BRANCH}"
+
+          git add "${GITOPS_PATH}/kustomization.yml" "${GITOPS_PATH}/release-patch.yml"
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git commit -m "Deploy mybuilds ${IMAGE_TAG}" -m "Release-Id: ${RELEASE_ID}"
+          git push --set-upstream origin "${DEPLOY_BRANCH}"
+
+          PR_URL="$(gh pr create \
+            --repo "${INFRA_REPOSITORY}" \
+            --base main \
+            --head "${DEPLOY_BRANCH}" \
+            --title "Deploy mybuilds ${IMAGE_TAG}" \
+            --body "Promotes mybuilds image \`${DIGEST}\`. Generated by ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}.")"
+
+          {
+            echo "changed=true"
+            echo "deploy_commit=$(git rev-parse HEAD)"
+            echo "pr_url=${PR_URL}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Squash merge
+        id: merge
+        if: steps.pr.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.INFRA_REPO_TOKEN }}
+          DEPLOY_COMMIT: ${{ steps.pr.outputs.deploy_commit }}
+          PR_URL: ${{ steps.pr.outputs.pr_url }}
+        run: |
+          set -euo pipefail
+
+          # Same subject format as personal-site and mynids, which the
+          # reliability scorecard recognizes.
+          gh pr merge "${PR_URL}" \
+            --repo "${INFRA_REPOSITORY}" \
+            --squash \
+            --match-head-commit "${DEPLOY_COMMIT}" \
+            --subject "Deploy mybuilds ${IMAGE_TAG} (#${PR_URL##*/})" \
+            --body "Release-Id: ${RELEASE_ID}"
+
+          GITOPS_SHA="$(gh pr view "${PR_URL}" \
+            --repo "${INFRA_REPOSITORY}" \
+            --json mergeCommit \
+            --jq '.mergeCommit.oid')"
+          if [ -z "${GITOPS_SHA}" ]; then
+            echo "::error::Could not read the squash commit for ${PR_URL}"
+            exit 1
+          fi
+          echo "gitops_sha=${GITOPS_SHA}" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### mybuilds image promoted"
+            echo "Release: \`${RELEASE_ID}\`"
+            echo "Digest: \`${DIGEST}\`"
+            echo "GitOps commit: \`${INFRA_REPOSITORY}@${GITOPS_SHA}\`"
           } >> "${GITHUB_STEP_SUMMARY}"

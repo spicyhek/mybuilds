@@ -171,11 +171,11 @@ func scanEvent(sc rowScanner) (events.Event, error) {
 
 // SaveProjection replaces a release's projected row, stages and steps in one
 // transaction, and links its events to it. The release keeps its UUID.
-func (s *Store) SaveProjection(ctx context.Context, p releases.Projection) error {
+func (s *Store) SaveProjection(ctx context.Context, p releases.Projection) (created bool, err error) {
 	r := p.Release
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer tx.Rollback()
 
@@ -183,15 +183,16 @@ func (s *Store) SaveProjection(ctx context.Context, p releases.Projection) error
 	err = tx.QueryRowContext(ctx, `SELECT uuid FROM releases WHERE release_id = ?`, r.ReleaseID).Scan(&uuid)
 	switch {
 	case err == sql.ErrNoRows:
+		created = true
 		uuid = releases.NewUUID()
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO releases (`+releaseColumns+`)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			append([]any{uuid}, releaseValues(r)...)...); err != nil {
-			return fmt.Errorf("insert release: %w", err)
+			return false, fmt.Errorf("insert release: %w", err)
 		}
 	case err != nil:
-		return err
+		return false, err
 	default:
 		if _, err := tx.ExecContext(ctx, `
 			UPDATE releases SET release_id = ?, service = ?, environment = ?, kind = ?, template = ?,
@@ -200,17 +201,17 @@ func (s *Store) SaveProjection(ctx context.Context, p releases.Projection) error
 				gitops_repository = ?, gitops_sha = ?, status = ?, created_at = ?, completed_at = ?, verified_at = ?
 			WHERE uuid = ?`,
 			append(releaseValues(r), uuid)...); err != nil {
-			return fmt.Errorf("update release: %w", err)
+			return false, fmt.Errorf("update release: %w", err)
 		}
 	}
 
 	for _, table := range []string{"release_steps", "release_stages"} {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE release_uuid = ?`, uuid); err != nil {
-			return fmt.Errorf("clear %s: %w", table, err)
+			return false, fmt.Errorf("clear %s: %w", table, err)
 		}
 	}
 	if err := insertStages(ctx, tx, uuid, r); err != nil {
-		return err
+		return false, err
 	}
 	for _, st := range p.Steps {
 		var sourceEvent any
@@ -224,7 +225,7 @@ func (s *Store) SaveProjection(ctx context.Context, p releases.Projection) error
 			uuid, st.StageKey, st.Attempt, st.Position, st.Name, string(st.State),
 			nullTime(st.StartedAt), nullTime(st.CompletedAt), nullString(st.Detail), boolInt(st.Reconstructed), sourceEvent,
 		); err != nil {
-			return fmt.Errorf("insert step %s/%d/%d: %w", st.StageKey, st.Attempt, st.Position, err)
+			return false, fmt.Errorf("insert step %s/%d/%d: %w", st.StageKey, st.Attempt, st.Position, err)
 		}
 	}
 
@@ -236,8 +237,40 @@ func (s *Store) SaveProjection(ctx context.Context, p releases.Projection) error
 		}
 		if _, err := tx.ExecContext(ctx,
 			`UPDATE events SET release_uuid = ? WHERE id IN (`+placeholders+`)`, args...); err != nil {
-			return fmt.Errorf("link events: %w", err)
+			return false, fmt.Errorf("link events: %w", err)
 		}
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	return created, nil
+}
+
+// EventsAfter returns up to limit events with an ID greater than afterID,
+// oldest first. The SSE stream uses it to replay what a client missed.
+func (s *Store) EventsAfter(ctx context.Context, afterID int64, limit int) ([]events.Event, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT `+eventColumns+` FROM events WHERE id > ? ORDER BY id LIMIT ?`, afterID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("events after %d: %w", afterID, err)
+	}
+	defer rows.Close()
+	var out []events.Event
+	for rows.Next() {
+		e, err := scanEvent(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+// LastEventID returns the highest event ID, or 0 when there are none.
+func (s *Store) LastEventID(ctx context.Context) (int64, error) {
+	var id sql.NullInt64
+	if err := s.db.QueryRowContext(ctx, `SELECT MAX(id) FROM events`).Scan(&id); err != nil {
+		return 0, fmt.Errorf("last event id: %w", err)
+	}
+	return id.Int64, nil
 }

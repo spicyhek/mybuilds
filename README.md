@@ -6,10 +6,11 @@ verified public response, with each stage backed by its own evidence. A green
 CI run, an Argo CD sync, a Ready pod and a passing public check are four
 separate facts; mybuilds never treats one as proof of another.
 
-**Status: M1, ingestion.** The server receives signed GitHub, CI and Argo CD
-events, stores each delivery once, and projects releases from Source through
-Reconcile. The SSE stream, the pipeline UI and deployment are next.
-`demo/index.html` is the standalone UI prototype with fixture data.
+**Status: M1, pipeline UI.** The server receives signed GitHub, CI and Argo
+CD events, stores each delivery once, projects releases from Source through
+Reconcile, streams changes over SSE and serves the React pipeline view.
+Deployment to the cluster is next. `demo/index.html` is the standalone UI
+prototype the view was built from.
 
 ## Layout
 
@@ -23,8 +24,9 @@ internal/ingest        authenticate, translate, store, re-project
   verify               HMAC and bearer-token checks
 internal/releases      release model, correlation and the projector
 internal/services      service map: repositories, workflows, jobs, apps
-internal/httpapi       health, read API, ingestion routes, static files, metrics
-internal/fixtures      sample releases for fixture mode
+internal/httpapi       health, read API, SSE stream, ingestion routes, static files, metrics
+internal/fixtures      sample releases and the recorded release replayed in fixture mode
+web/                   React + TypeScript frontend (Vite); dist/ is embedded into the binary
 docs/ingestion.md      the three ingestion contracts
 web/                   frontend embedded into the binary (placeholder for now)
 demo/                  standalone UI prototype
@@ -53,18 +55,34 @@ with no evidence before one that has started shows `unknown`.
 
 ## Run locally
 
+Build the frontend once (Node 22), then run the server:
+
 ```bash
+(cd web && npm ci && npm run build)
 MYBUILDS_FIXTURES=true go run ./cmd/server
 ```
 
 PowerShell:
 
 ```powershell
+cd web; npm ci; npm run build; cd ..
 $env:MYBUILDS_FIXTURES = 'true'; go run ./cmd/server
 ```
 
 The UI and API are on <http://localhost:8080>, metrics on
 <http://localhost:9090/metrics>. The database is created at `data/mybuilds.db`.
+Without a frontend build the API still works and pages answer 404.
+
+Fixture mode inserts two sample releases and then replays the recorded
+`personal-site` release #11 through the real ingestion path, with its
+timestamps shifted to now and the real gaps between deliveries (long waits
+capped at 20 s), so the pipeline view moves live about five seconds after
+startup. The replay is skipped when that release is already in the database;
+delete the database file to see it again.
+
+For frontend work, `npm run dev` in `web/` serves the app on
+<http://localhost:5173> with hot reload and proxies `/api`, `/hooks` and the
+health endpoints to the Go server on :8080.
 
 ## Configuration
 
@@ -95,6 +113,8 @@ serves production, screenshots and the CI smoke test.
 | `GET /readyz` | Readiness. 503 when the database does not answer |
 | `GET /api/v1/releases?limit=N` | Newest releases first, with stages. `next_cursor` is null until cursor pagination lands |
 | `GET /api/v1/releases/{release_id}` | One release with each stage's steps. IDs contain slashes, e.g. `personal-site/ce61154/production/11` |
+| `GET /api/v1/stream` | Server-Sent Events: `hello`, then `release.created` and `release.updated` with the full release view. The SSE `id` is the event ID; a reconnect with `Last-Event-ID` replays what was missed, or sends `snapshot` when the cursor is too old |
+| `GET /api/v1/meta` | Version, release ID, fixture mode and the public parts of the service map |
 | `POST /hooks/github` | GitHub `workflow_run` and `workflow_job` webhooks |
 | `POST /api/v1/ci-events` | CI-signed `release.published`, `gitops.updated`, `gitops.superseded` |
 | `POST /hooks/argocd` | Argo CD Notifications |
@@ -112,8 +132,9 @@ docker build -t mybuilds .
 docker run --rm -p 8080:8080 -p 9090:9090 -e MYBUILDS_FIXTURES=true mybuilds
 ```
 
-The image is `distroless/static`, runs as `nonroot` (uid 65532) and keeps its
-database in `/data`. When a volume is mounted there, set `fsGroup: 65532` on
+The Dockerfile builds the frontend in a Node stage, so no local `npm run
+build` is needed for the image. The image is `distroless/static`, runs as
+`nonroot` (uid 65532) and keeps its database in `/data`. When a volume is mounted there, set `fsGroup: 65532` on
 the pod. SQLite comes from the pure-Go `modernc.org/sqlite`, so the build has
 `CGO_ENABLED=0` and cross-compiles for the cluster's arm64 nodes.
 
@@ -127,7 +148,18 @@ go test ./...
 deliveries: in live order, again as duplicates, and reversed and shuffled,
 and checks that the release is the same each time.
 
-CI (`.github/workflows/release.yml`) runs `gofmt`, `go vet` and the tests on
-every pull request. On `main` it also builds the image, runs a smoke test
+CI (`.github/workflows/release.yml`) builds the frontend (which type-checks
+it), then runs `gofmt`, `go vet` and the tests on every pull request. On `main` it also builds the image, runs a smoke test
 against it, pushes `linux/amd64` and `linux/arm64` to
 `ghcr.io/spicyhek/mybuilds` and records the digest.
+
+The `bump-gitops` job then promotes that digest the same way personal-site
+does: it pins it in `homelab-infra/k8s/apps/mybuilds/kustomization.yml`,
+rewrites `release-patch.yml` with the release ID, opens a pull request and
+squash-merges it as `Deploy mybuilds sha-...` with a `Release-Id:` trailer,
+and Argo CD syncs it. It needs the `INFRA_REPO_TOKEN` Actions secret, a
+fine-grained token limited to `homelab-infra` with `contents: write` and
+`pull-requests: write`. A run whose commit is no longer the head of `main`
+skips the promotion, and until the manifests exist on `homelab-infra` main the
+job only warns, so pushes before the first deploy publish an image without
+promoting it.

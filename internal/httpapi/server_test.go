@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -15,7 +16,6 @@ import (
 	"github.com/spicyhek/mybuilds/internal/ingest"
 	"github.com/spicyhek/mybuilds/internal/services"
 	"github.com/spicyhek/mybuilds/internal/storage"
-	"github.com/spicyhek/mybuilds/web"
 )
 
 const testReleaseID = "mybuilds/0123456/production/7"
@@ -36,9 +36,9 @@ func newTestServer(t *testing.T) (http.Handler, *storage.Store) {
 		t.Fatal(err)
 	}
 
-	dist, err := web.Dist()
-	if err != nil {
-		t.Fatal(err)
+	dist := fstest.MapFS{
+		"index.html":    {Data: []byte("<!doctype html><title>mybuilds</title><div id=root></div>")},
+		"assets/app.js": {Data: []byte("console.log('app')")},
 	}
 
 	h := New(Options{
@@ -144,7 +144,7 @@ func TestListReleasesRejectsBadLimit(t *testing.T) {
 func TestGetReleaseWithSlashesInID(t *testing.T) {
 	h, _ := newTestServer(t)
 
-	rec := get(t, h, "/api/v1/releases/personal-site/ce61154/production/11")
+	rec := get(t, h, "/api/v1/releases/personal-site/config/5bb4095/production")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body %s", rec.Code, rec.Body.String())
 	}
@@ -152,7 +152,7 @@ func TestGetReleaseWithSlashesInID(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if got["release_id"] != "personal-site/ce61154/production/11" || got["kind"] != "application" {
+	if got["release_id"] != "personal-site/config/5bb4095/production" || got["kind"] != "config" {
 		t.Errorf("got %v", got)
 	}
 

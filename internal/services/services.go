@@ -24,9 +24,15 @@ type Service struct {
 	// Workflow is the release workflow's path in the repository.
 	Workflow string `json:"workflow"`
 	// Branch is the branch whose pushes are releases.
-	Branch            string         `json:"branch"`
-	ArgoCDApplication string         `json:"argocd_application"`
-	Jobs              map[string]Job `json:"jobs"`
+	Branch            string `json:"branch"`
+	ArgoCDApplication string `json:"argocd_application"`
+	// GitOpsRepository and GitOpsPath are where the digest bump lands, and
+	// Artifact is the image the workflow publishes. All three are shown in
+	// the UI's stage detail panel.
+	GitOpsRepository string         `json:"gitops_repository"`
+	GitOpsPath       string         `json:"gitops_path"`
+	Artifact         string         `json:"artifact"`
+	Jobs             map[string]Job `json:"jobs"`
 }
 
 // Job maps one workflow job's steps to pipeline stages.
