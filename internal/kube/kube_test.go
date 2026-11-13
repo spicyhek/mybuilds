@@ -58,7 +58,9 @@ func replicaSet(hash, revision string, created int) *appsv1.ReplicaSet {
 			Labels:            map[string]string{ManagedLabel: "true", podTemplateHash: hash},
 			Annotations:       map[string]string{revisionAnnotation: revision},
 			OwnerReferences:   []metav1.OwnerReference{{Kind: "Deployment", Name: "personal-site", Controller: ptr(true)}}},
-		Spec: appsv1.ReplicaSetSpec{Replicas: ptr(int32(2))},
+		Spec: appsv1.ReplicaSetSpec{Replicas: ptr(int32(2)), Template: corev1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}},
+			Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "web", Image: image}}}}},
 	}
 }
 
@@ -153,6 +155,8 @@ type harness struct {
 	w         *Watcher
 	now       time.Time
 	nextEvent int
+	// serving is the release-id annotation of the pods rollout starts.
+	serving string
 }
 
 func newHarness(t *testing.T) *harness {
@@ -221,10 +225,35 @@ func (h *harness) sync(gitops string, started, finished int) {
 		StartedAt: ptr(at(started)), FinishedAt: ptr(at(finished))})
 }
 
+// configSync records Argo CD syncing a human commit, keyed the way
+// ingestion keys a commit without a Release-Id trailer.
+func (h *harness) configSync(gitops string, started, finished int) string {
+	id := releases.ConfigReleaseID("personal-site", "production", gitops)
+	keys := events.Keys{ReleaseID: id, Revision: gitops}
+	for _, n := range []events.ArgoCDNotification{
+		{Trigger: events.TriggerSyncRunning, StartedAt: ptr(at(started))},
+		{Trigger: events.TriggerSyncSucceeded, StartedAt: ptr(at(started)), FinishedAt: ptr(at(finished))},
+	} {
+		n.Application, n.Revision = "personal-site", gitops
+		n.CommitSubject, n.CommitAuthor = "Raise personal-site memory limit", "spicyhek"
+		occurred := started
+		if n.FinishedAt != nil {
+			occurred = finished
+		}
+		h.provider(events.ProviderArgoCD, events.TypeArgoCD, occurred, keys, n)
+	}
+	return id
+}
+
 func (h *harness) rollout(hash, revision string, base int, digest string) {
 	gen := int64(50 + base)
 	h.observe(base+1, deployment(revision, gen, gen, 3, 1, 2, "ReplicaSetUpdated", base+1))
-	h.observe(base+1, replicaSet(hash, revision, base+1))
+	rs := replicaSet(hash, revision, base+1)
+	rs.Spec.Template.Spec.Containers[0].Image = image + "@" + digest
+	if h.serving != "" {
+		rs.Spec.Template.Annotations[releaseIDAnnotation] = h.serving
+	}
+	h.observe(base+1, rs)
 	h.observe(base+2, pod(hash, "a", base+1, 0, digest))
 	h.observe(base+8, pod(hash, "a", base+1, base+8, digest))
 	h.observe(base+9, pod(hash, "b", base+8, 0, digest))
@@ -303,3 +332,84 @@ func TestWatcherAttributesRolloutsBySyncWindow(t *testing.T) {
 func itoa(n int) string { return strconv.Itoa(n) }
 
 func discardLogger() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
+
+func TestConfigChangeLeavesTheApplicationReleaseUnchanged(t *testing.T) {
+	h := newHarness(t)
+	g1 := strings.Repeat("1", 40)
+	g2 := strings.Repeat("c", 40)
+
+	r1 := h.release(11, strings.Repeat("a", 40), g1, digestOf('a'), 0)
+	h.serving = r1
+	h.sync(g1, 100, 104)
+	h.rollout("aaaaaaaaaa", "11", 100, digestOf('a'))
+	before, err := h.store.GetRelease(h.ctx, r1)
+	if err != nil || before.Status != releases.StateRunning || before.Stages[5].State != releases.StateSucceeded {
+		t.Fatalf("release 1 before the config change: %v %v", before, err)
+	}
+
+	// A human edit to the pod template: new pods, same digest and
+	// release-id annotation as release 1.
+	cfg := h.configSync(g2, 300, 303)
+	h.rollout("cccccccccc", "12", 300, digestOf('a'))
+
+	after, err := h.store.GetRelease(h.ctx, r1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Stages[5].State != releases.StateSucceeded || !after.Stages[5].CompletedAt.Equal(*before.Stages[5].CompletedAt) {
+		t.Errorf("release 1 rollout changed: %s at %v", after.Stages[5].State, after.Stages[5].CompletedAt)
+	}
+	for _, s := range h.rolloutStage(r1).Steps {
+		if strings.Contains(s.Name, "cccccccccc") {
+			t.Errorf("release 1 shows the config rollout's pod %s", s.Name)
+		}
+	}
+
+	c, err := h.store.GetRelease(h.ctx, cfg)
+	if err != nil {
+		t.Fatalf("config release: %v", err)
+	}
+	if c.Kind != releases.KindConfig || c.GitOpsSHA != g2 || c.GitOpsSubject != "Raise personal-site memory limit" {
+		t.Errorf("config release %s %s %q", c.Kind, c.GitOpsSHA, c.GitOpsSubject)
+	}
+	ro := h.rolloutStage(cfg)
+	if ro.State != releases.StateSucceeded || c.RuntimeReleaseID != r1 || c.ArtifactDigest != digestOf('a') {
+		t.Errorf("config rollout %s (%s), serving %q on %q", ro.State, ro.FailureReason, c.RuntimeReleaseID, c.ArtifactDigest)
+	}
+
+	// The verifier checks the config release for release 1's X-Release-ID.
+	cands, err := h.store.VerifyCandidates(h.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, c := range cands {
+		if c.ReleaseID == cfg {
+			found = c.Expected == r1
+		}
+	}
+	if !found {
+		t.Errorf("config release not a candidate expecting %s: %+v", r1, cands)
+	}
+
+	// A later config commit that changes no pods waits for the no-rollout
+	// timer.
+	g3 := strings.Repeat("d", 40)
+	quiet := h.configSync(g3, 600, 603)
+	idle, err := h.store.IdleConfigReleases(h.ctx)
+	if err != nil || len(idle) != 1 || idle[0].ReleaseID != quiet || !idle[0].ReconcileStartedAt.Equal(at(600)) ||
+		!idle[0].ReconcileDoneAt.Equal(at(603)) {
+		t.Errorf("idle config releases %+v %v", idle, err)
+	}
+
+	// The same after a rebuild from events.
+	if _, err := h.projector.RebuildAll(h.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if st := h.rolloutStage(r1); !st.CompletedAt.Equal(*before.Stages[5].CompletedAt) {
+		t.Errorf("release 1 after rebuild: %v", st.CompletedAt)
+	}
+	if st := h.rolloutStage(cfg); st.State != releases.StateSucceeded {
+		t.Errorf("config release after rebuild: %s", st.State)
+	}
+}

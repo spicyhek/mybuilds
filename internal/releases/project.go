@@ -63,10 +63,16 @@ func ProjectWithRuntime(releaseID string, evs []events.Event, svc services.Servi
 		Kind:        KindApplication,
 		Template:    TemplateApplication,
 	}
+	if parts.Kind == KindConfig {
+		f.release.Kind, f.release.Template = KindConfig, TemplateConfig
+	}
 	for _, e := range sorted {
 		if err := f.add(e); err != nil {
 			return Projection{}, fmt.Errorf("event %d (%s): %w", e.ID, e.Type, err)
 		}
+	}
+	if parts.Kind == KindConfig {
+		return f.resultConfig(parts.ShortSHA), nil
 	}
 	return f.result(), nil
 }
@@ -115,6 +121,11 @@ type fold struct {
 	argo       []argoObs
 	checks     []checkObs
 	ended      *endObs
+	noRollout  *events.NoRollout
+
+	// Set by rollout: what the new pods carry.
+	runtimeReleaseID string
+	runtimeDigest    string
 }
 
 // statusRank orders GitHub run and job statuses so that a late "in_progress"
@@ -192,6 +203,15 @@ func (f *fold) add(e events.Event) error {
 		}
 		if f.ended == nil || p.OccurredAt.Before(f.ended.e.OccurredAt) {
 			f.ended = &endObs{e: p, eventID: e.ID}
+		}
+
+	case events.TypeNoRollout:
+		var p events.NoRollout
+		if err := e.Decode(&p); err != nil {
+			return err
+		}
+		if f.noRollout == nil || p.OccurredAt.Before(f.noRollout.OccurredAt) {
+			f.noRollout = &p
 		}
 
 	case events.TypeArgoCD:
@@ -454,29 +474,53 @@ func (f *fold) result() Projection {
 		}
 	} else if r.GitOpsSHA != "" {
 		steps = append(steps, f.reconcile(reconcile, r.GitOpsSHA)...)
-		// Rollout: the workload between this sync and the next (plan
-		// section 8.4). A failed sync applied nothing to roll out.
-		if f.runtime != nil && reconcile.State != StateFailed {
-			steps = append(steps, f.rollout(stages["rollout"], r, f.runtime)...)
-		}
 	}
-
-	// Verify: public checks once Rollout has succeeded (plan section 8.5).
-	var samples []Sample
-	if stages["rollout"].State == StateSucceeded {
-		var vsteps []Step
-		vsteps, samples = f.verify(stages["verify"])
-		steps = append(steps, vsteps...)
-		if v := stages["verify"]; v.State == StateSucceeded {
-			r.VerifiedAt = v.CompletedAt
-		}
-	}
+	rsteps, samples := f.runtimeStages(&r, stages)
+	steps = append(steps, rsteps...)
 
 	settle(r.Stages)
 	r.Status, r.CompletedAt = releaseStatus(r)
 	numberSteps(steps)
 
 	return Projection{Release: r, Steps: steps, EventIDs: f.eventIDs, Samples: samples}
+}
+
+// runtimeStages projects Rollout and Verify, which both templates share.
+// Reconcile is already projected.
+func (f *fold) runtimeStages(r *Release, stages map[string]*Stage) ([]Step, []Sample) {
+	var steps []Step
+	rollout, verify := stages["rollout"], stages["verify"]
+	// Rollout: the workload between this sync and the next (plan section
+	// 8.4). A failed sync applied nothing to roll out.
+	if !r.Superseded && r.GitOpsSHA != "" && f.runtime != nil && stages["reconcile"].State != StateFailed {
+		steps = append(steps, f.rollout(rollout, *r, f.runtime)...)
+		r.RuntimeReleaseID = f.runtimeReleaseID
+		if r.Kind == KindConfig && f.runtimeDigest != "" {
+			r.ArtifactDigest = f.runtimeDigest
+			r.Artifact = f.svc.Artifact
+		}
+	}
+	// A sync that replaced no pods (plan section 8.7): nothing to roll out
+	// or verify.
+	if rollout.State == StatePending && f.noRollout != nil && stages["reconcile"].State == StateSucceeded {
+		rollout.State = StateSkipped
+		rollout.Summary = "The sync replaced no pods"
+		rollout.CompletedAt = timePtr(f.noRollout.OccurredAt)
+		verify.State = StateSkipped
+		verify.Summary = "Nothing rolled out to verify"
+	}
+
+	// Verify: public checks once Rollout has succeeded (plan section 8.5).
+	var samples []Sample
+	if rollout.State == StateSucceeded {
+		var vsteps []Step
+		vsteps, samples = f.verify(verify, *r)
+		steps = append(steps, vsteps...)
+		if verify.State == StateSucceeded {
+			r.VerifiedAt = verify.CompletedAt
+		}
+	}
+	return steps, samples
 }
 
 func (f *fold) runBounds() (first, latest *runObs) {

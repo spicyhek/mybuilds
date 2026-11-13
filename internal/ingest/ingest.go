@@ -184,7 +184,7 @@ func (in *Ingester) Ingest(ctx context.Context, provider string, header http.Hea
 		if err := verify.BearerToken(in.secrets.ArgoCDToken, header.Get("Authorization")); err != nil {
 			return Result{}, reject(http.StatusUnauthorized, "authorization: %v", err)
 		}
-		ev, err = argocd.Translate(body, bodyHash(body))
+		ev, err = argocd.Translate(body, bodyHash(body), in.services)
 
 	default:
 		return Result{}, reject(http.StatusNotFound, "unknown provider %q", provider)

@@ -66,6 +66,14 @@ type Release struct {
 	ArtifactDigest   string `json:"artifact_digest,omitempty"`
 	GitOpsRepository string `json:"gitops_repository,omitempty"`
 	GitOpsSHA        string `json:"gitops_sha,omitempty"`
+	// GitOpsSubject and GitOpsAuthor describe a config release's commit,
+	// from Argo CD's commit metadata. Only the subject line is kept.
+	GitOpsSubject string `json:"gitops_subject,omitempty"`
+	GitOpsAuthor  string `json:"gitops_author,omitempty"`
+	// RuntimeReleaseID is the release-id annotation of the pods the rollout
+	// started. A config release's pods carry the application release they
+	// run, and its verification expects that X-Release-ID.
+	RuntimeReleaseID string `json:"runtime_release_id,omitempty"`
 
 	Status      State      `json:"status"`
 	CreatedAt   time.Time  `json:"created_at"`

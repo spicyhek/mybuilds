@@ -31,8 +31,16 @@ export function ReleaseDetails({ release: r }: { release: Release }) {
         mono
         copy={r.gitops_sha}
         href={r.gitops_repository && r.gitops_sha ? `https://github.com/${r.gitops_repository}/commit/${r.gitops_sha}` : undefined}
-        awaiting={r.superseded ? "superseded, no promotion" : "awaiting gitops.updated"}
+        awaiting={r.superseded ? "superseded, no promotion" : r.kind === "config" ? "awaiting sync" : "awaiting gitops.updated"}
       />
+      {r.kind === "config" ? (
+        <>
+          <Field k="Commit" v={r.gitops_subject} awaiting="awaiting commit metadata" />
+          <Field k="Author" v={r.gitops_author} awaiting="awaiting commit metadata" />
+          <Field k="Serving" v={r.runtime_release_id} mono copy awaiting="awaiting rollout" />
+          <Field k="Digest" v={r.artifact_digest ? shortDigest(r.artifact_digest) : undefined} mono copy={r.artifact_digest} awaiting="awaiting rollout" />
+        </>
+      ) : null}
       <Field
         k="Argo CD sync"
         v={reconcile && reconcile.state !== "pending" ? reconcile.summary ?? reconcile.failure_reason ?? reconcile.state : undefined}

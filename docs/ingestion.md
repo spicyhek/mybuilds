@@ -191,7 +191,7 @@ The payload fields:
 | `revision` | yes | Full GitOps commit SHA |
 | `sync_status`, `health_status`, `operation_phase` | no | Shown in the Sync step |
 | `started_at`, `finished_at` | no | RFC 3339; empty, `<nil>` or `<no value>` mean absent |
-| `commit_message` | no | Only the subject line and a `Release-Id:` trailer are kept |
+| `commit_message` | no | Only the subject line and a `Release-Id:` trailer are kept. A sync of a service's own Application whose commit has no trailer names a config release ([`config-releases.md`](config-releases.md)) |
 | `commit_author` | no | For display of config releases (plan section 8.7) |
 
 `on-health-degraded` is stored for the Rollout stage (M2) and does not change

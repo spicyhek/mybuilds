@@ -48,6 +48,9 @@ export interface Release {
   artifact_digest?: string;
   gitops_repository?: string;
   gitops_sha?: string;
+  gitops_subject?: string;
+  gitops_author?: string;
+  runtime_release_id?: string;
   status: State;
   created_at: string;
   completed_at?: string;

@@ -30,7 +30,14 @@ const (
 type Store interface {
 	InsertEvent(ctx context.Context, e *events.Event) (bool, error)
 	VerifyCandidates(ctx context.Context) ([]storage.VerifyCandidate, error)
+	IdleConfigReleases(ctx context.Context) ([]storage.IdleCandidate, error)
 }
+
+// NoRolloutGrace is how long after a config release's sync finishes the
+// verifier waits for its rollout to start. The Deployment controller
+// creates a ReplicaSet within seconds of the apply, which Argo CD has done
+// by the time the sync succeeds.
+const NoRolloutGrace = time.Minute
 
 // Projector re-projects the releases an event touches.
 type Projector interface {
@@ -49,6 +56,11 @@ type Options struct {
 	Interval   time.Duration
 	Tick       time.Duration
 	Now        func() time.Time
+	// WatchSyncedAt reports when the runtime watch completed its initial
+	// list. A config release is only recorded as replacing no pods when the
+	// watch was running since before its sync started. Nil means there is
+	// no watch.
+	WatchSyncedAt func() (time.Time, bool)
 }
 
 // Verifier checks releases whose Rollout succeeded until their Verify stage
@@ -113,6 +125,9 @@ func (v *Verifier) Run(ctx context.Context) {
 // Step does whatever is due now: closes stale windows and runs the checks
 // that are due.
 func (v *Verifier) Step(ctx context.Context) error {
+	if err := v.idle(ctx); err != nil {
+		return err
+	}
 	cands, err := v.opts.Store.VerifyCandidates(ctx)
 	if err != nil {
 		return err
@@ -149,8 +164,11 @@ func (v *Verifier) Step(ctx context.Context) error {
 			if err := v.end(ctx, c.ReleaseID, events.EndExpired, deadline); err != nil {
 				return err
 			}
+		case c.Expected == "":
+			// A config release whose pods carry no release ID; the
+			// projection skips its Verify.
 		case c.LastCheckAt == nil || now.Sub(*c.LastCheckAt) >= v.opts.Interval:
-			if err := v.check(ctx, svc, c.ReleaseID, now); err != nil {
+			if err := v.check(ctx, svc, c.ReleaseID, c.Expected, now); err != nil {
 				return err
 			}
 		}
@@ -158,10 +176,42 @@ func (v *Verifier) Step(ctx context.Context) error {
 	return nil
 }
 
-func (v *Verifier) check(ctx context.Context, svc services.Service, releaseID string, now time.Time) error {
-	res := v.opts.Checker.Check(ctx, *svc.Verify, releaseID, now)
+// idle records config releases whose sync replaced no pods.
+func (v *Verifier) idle(ctx context.Context) error {
+	if v.opts.WatchSyncedAt == nil {
+		return nil
+	}
+	syncedAt, ok := v.opts.WatchSyncedAt()
+	if !ok {
+		return nil
+	}
+	cands, err := v.opts.Store.IdleConfigReleases(ctx)
+	if err != nil {
+		return err
+	}
+	now := v.opts.Now()
+	for _, c := range cands {
+		due := c.ReconcileDoneAt.Add(NoRolloutGrace)
+		if syncedAt.After(c.ReconcileStartedAt) || now.Before(due) {
+			continue
+		}
+		v.opts.Logger.Info("config release replaced no pods", "release_id", c.ReleaseID)
+		if err := v.store(ctx, events.TypeNoRollout, "no-rollout/"+c.ReleaseID, c.ReleaseID, due,
+			events.NoRollout{ReleaseID: c.ReleaseID, GraceSeconds: int(NoRolloutGrace.Seconds()), OccurredAt: due.UTC()}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (v *Verifier) check(ctx context.Context, svc services.Service, releaseID, expected string, now time.Time) error {
+	res := v.opts.Checker.Check(ctx, *svc.Verify, expected, now)
 	if ctx.Err() != nil {
 		return nil
+	}
+	res.ReleaseID = releaseID
+	if expected != releaseID {
+		res.ExpectedReleaseID = expected
 	}
 	v.checks.WithLabelValues(svc.Name, res.Result).Inc()
 	if res.StatusCode != 0 {

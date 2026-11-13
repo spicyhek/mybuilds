@@ -193,6 +193,16 @@ func (m Map) ByName(name string) (Service, bool) {
 	return Service{}, false
 }
 
+// ByApplication finds the service whose own Argo CD Application is app.
+func (m Map) ByApplication(app string) (Service, bool) {
+	for _, s := range m.services {
+		if app != "" && s.ArgoCDApplication == app {
+			return s, true
+		}
+	}
+	return Service{}, false
+}
+
 // ByWorkload finds the service whose workload key is key.
 func (m Map) ByWorkload(key string) (Service, bool) {
 	for _, s := range m.services {

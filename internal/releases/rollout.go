@@ -108,6 +108,9 @@ type rolloutResult struct {
 	ready   int
 	// mismatch names a Ready pod running another digest.
 	mismatch string
+	// digest is the one the pods must run: the release's, or for a config
+	// release, the new ReplicaSet's template image.
+	digest string
 }
 
 func (v *rolloutView) apply(e events.Event) (bool, error) {
@@ -173,7 +176,11 @@ func (v *rolloutView) evaluate(digest, artifact string, at time.Time) rolloutRes
 			}
 			return a.Name < b.Name
 		})
+		if digest == "" {
+			digest = templateDigest(res.newRS.rs.Images, artifact)
+		}
 	}
+	res.digest = digest
 
 	if dep != nil {
 		for _, c := range dep.Conditions {
@@ -296,7 +303,7 @@ func (f *fold) rollout(st *Stage, r Release, rt *Runtime) []Step {
 	switch res.state {
 	case StateSucceeded:
 		st.CompletedAt = latest(res.completed, st.StartedAt)
-		st.Summary = fmt.Sprintf("%d/%d pods ready on %s", res.ready, v.dep.Replicas, short(r.ArtifactDigest, 19))
+		st.Summary = fmt.Sprintf("%d/%d pods ready on %s", res.ready, v.dep.Replicas, short(res.digest, 19))
 	case StateFailed:
 		st.CompletedAt = latest(res.completed, st.StartedAt)
 		st.FailureReason = res.reason
@@ -308,7 +315,11 @@ func (f *fold) rollout(st *Stage, r Release, rt *Runtime) []Step {
 			st.Summary = fmt.Sprintf("%d/%d pods ready", res.ready, v.dep.Replicas)
 		}
 	}
-	return rolloutSteps(v, res, r.ArtifactDigest, artifact, oldScaledAt)
+	if res.newRS != nil {
+		f.runtimeReleaseID = res.newRS.rs.ReleaseID
+	}
+	f.runtimeDigest = res.digest
+	return rolloutSteps(v, res, res.digest, artifact, oldScaledAt)
 }
 
 func rolloutSteps(v *rolloutView, res rolloutResult, digest, artifact string, oldScaledAt *time.Time) []Step {
@@ -445,4 +456,15 @@ func latest(a, b *time.Time) *time.Time {
 		return b
 	}
 	return a
+}
+
+// templateDigest is the digest of the artifact's image in a pod template.
+func templateDigest(images []string, artifact string) string {
+	for _, img := range images {
+		repo, digest, ok := strings.Cut(img, "@")
+		if ok && (artifact == "" || imageRepository(repo) == artifact) {
+			return digest
+		}
+	}
+	return ""
 }
