@@ -7,10 +7,12 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 )
 
 //go:embed services.json
@@ -37,6 +39,53 @@ type Service struct {
 	// Workload is the Deployment the Rollout stage watches. Without it the
 	// service's releases stop at Reconcile.
 	Workload *Workload `json:"workload,omitempty"`
+	// Verify is the public check of the Verify stage. Without it, Verify
+	// is skipped once Rollout succeeds.
+	Verify *Verify `json:"verify,omitempty"`
+}
+
+// Verify configures the public check (plan section 8.5).
+type Verify struct {
+	// URL is checked through the public route, normally Cloudflare.
+	URL string `json:"url"`
+	// AllowedStatus defaults to [200].
+	AllowedStatus []int `json:"allowed_status,omitempty"`
+	// MaxLatencyMS defaults to 2000.
+	MaxLatencyMS int `json:"max_latency_ms,omitempty"`
+	// WindowSeconds, from Rollout's completion, defaults to 600.
+	WindowSeconds int `json:"window_seconds,omitempty"`
+	// HealthBody, when set, requires a JSON body field to equal a value.
+	HealthBody *HealthBody `json:"health_body,omitempty"`
+}
+
+// HealthBody is a required JSON field value, such as status = ok.
+type HealthBody struct {
+	Field string `json:"field"`
+	Value string `json:"value"`
+}
+
+// Status returns the allowed status codes.
+func (v Verify) Status() []int {
+	if len(v.AllowedStatus) == 0 {
+		return []int{200}
+	}
+	return v.AllowedStatus
+}
+
+// MaxLatency returns the latency threshold.
+func (v Verify) MaxLatency() time.Duration {
+	if v.MaxLatencyMS <= 0 {
+		return 2 * time.Second
+	}
+	return time.Duration(v.MaxLatencyMS) * time.Millisecond
+}
+
+// Window returns how long after Rollout the checks may run.
+func (v Verify) Window() time.Duration {
+	if v.WindowSeconds <= 0 {
+		return 10 * time.Minute
+	}
+	return time.Duration(v.WindowSeconds) * time.Second
 }
 
 // Workload names a Deployment. The runtime watch only sees objects labeled
@@ -115,6 +164,14 @@ func Parse(data []byte) (Map, error) {
 		}
 		if w := s.Workload; w != nil && (!namePattern.MatchString(w.Namespace) || !namePattern.MatchString(w.Deployment)) {
 			return Map{}, fmt.Errorf("service %q: workload needs a valid namespace and deployment", s.Name)
+		}
+		if v := s.Verify; v != nil {
+			if u, err := url.Parse(v.URL); err != nil || u.Scheme != "https" || u.Host == "" {
+				return Map{}, fmt.Errorf("service %q: verify url must be an https URL", s.Name)
+			}
+			if h := v.HealthBody; h != nil && (h.Field == "" || h.Value == "") {
+				return Map{}, fmt.Errorf("service %q: health_body needs a field and a value", s.Name)
+			}
 		}
 		seen[s.Name] = true
 	}

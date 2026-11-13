@@ -206,7 +206,7 @@ func (s *Store) SaveProjection(ctx context.Context, p releases.Projection) (crea
 		}
 	}
 
-	for _, table := range []string{"release_steps", "release_stages"} {
+	for _, table := range []string{"release_steps", "release_stages", "verification_samples"} {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE release_uuid = ?`, uuid); err != nil {
 			return false, fmt.Errorf("clear %s: %w", table, err)
 		}
@@ -227,6 +227,26 @@ func (s *Store) SaveProjection(ctx context.Context, p releases.Projection) (crea
 			nullTime(st.StartedAt), nullTime(st.CompletedAt), nullString(st.Detail), boolInt(st.Reconstructed), sourceEvent,
 		); err != nil {
 			return false, fmt.Errorf("insert step %s/%d/%d: %w", st.StageKey, st.Attempt, st.Position, err)
+		}
+	}
+
+	for _, sm := range p.Samples {
+		var health any
+		if sm.HealthOK != nil {
+			health = boolInt(*sm.HealthOK)
+		}
+		var status, latency any
+		if sm.StatusCode != 0 {
+			status, latency = sm.StatusCode, sm.LatencyMS
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO verification_samples (release_uuid, endpoint, ok, status_code, latency_ms,
+				observed_release_id, health_ok, checked_at, failure_reason)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			uuid, sm.Endpoint, boolInt(sm.OK), status, latency, nullString(sm.ObservedReleaseID), health,
+			formatTime(sm.CheckedAt), nullString(sm.FailureReason),
+		); err != nil {
+			return false, fmt.Errorf("insert verification sample: %w", err)
 		}
 	}
 

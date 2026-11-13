@@ -18,6 +18,8 @@ type Projection struct {
 	Steps []Step
 	// EventIDs are the events that belong to this release.
 	EventIDs []int64
+	// Samples are the release's verification checks.
+	Samples []Sample
 }
 
 // Project reduces a release's events to its current state. It is a pure
@@ -111,6 +113,8 @@ type fold struct {
 	gitops     *ciObs[events.GitOpsUpdated]
 	superseded *ciObs[events.GitOpsSuperseded]
 	argo       []argoObs
+	checks     []checkObs
+	ended      *endObs
 }
 
 // statusRank orders GitHub run and job statuses so that a late "in_progress"
@@ -172,6 +176,22 @@ func (f *fold) add(e events.Event) error {
 		}
 		if a := max(p.RunAttempt, 1); f.superseded == nil || a >= f.superseded.attempt {
 			f.superseded = &ciObs[events.GitOpsSuperseded]{payload: p, attempt: a, eventID: e.ID}
+		}
+
+	case events.TypeVerifyCheck:
+		var p events.VerifyCheck
+		if err := e.Decode(&p); err != nil {
+			return err
+		}
+		f.checks = append(f.checks, checkObs{c: p, eventID: e.ID})
+
+	case events.TypeVerifyEnded:
+		var p events.VerifyEnded
+		if err := e.Decode(&p); err != nil {
+			return err
+		}
+		if f.ended == nil || p.OccurredAt.Before(f.ended.e.OccurredAt) {
+			f.ended = &endObs{e: p, eventID: e.ID}
 		}
 
 	case events.TypeArgoCD:
@@ -441,11 +461,22 @@ func (f *fold) result() Projection {
 		}
 	}
 
+	// Verify: public checks once Rollout has succeeded (plan section 8.5).
+	var samples []Sample
+	if stages["rollout"].State == StateSucceeded {
+		var vsteps []Step
+		vsteps, samples = f.verify(stages["verify"])
+		steps = append(steps, vsteps...)
+		if v := stages["verify"]; v.State == StateSucceeded {
+			r.VerifiedAt = v.CompletedAt
+		}
+	}
+
 	settle(r.Stages)
 	r.Status, r.CompletedAt = releaseStatus(r)
 	numberSteps(steps)
 
-	return Projection{Release: r, Steps: steps, EventIDs: f.eventIDs}
+	return Projection{Release: r, Steps: steps, EventIDs: f.eventIDs, Samples: samples}
 }
 
 func (f *fold) runBounds() (first, latest *runObs) {
@@ -660,12 +691,15 @@ func settle(stages []Stage) {
 }
 
 func releaseStatus(r Release) (State, *time.Time) {
-	anyFailed, allDone := false, true
+	anyFailed, anyDegraded, allDone := false, false, true
 	frontier := -1 // the last stage with any evidence
 	var completed *time.Time
 	for i, st := range r.Stages {
 		if st.State == StateFailed {
 			anyFailed = true
+		}
+		if st.State == StateDegraded {
+			anyDegraded = true
 		}
 		if st.State != StatePending {
 			frontier = i
@@ -680,6 +714,8 @@ func releaseStatus(r Release) (State, *time.Time) {
 	switch {
 	case anyFailed:
 		return StateFailed, completed
+	case anyDegraded:
+		return StateDegraded, completed
 	case r.Superseded:
 		return StateSkipped, completed
 	case allDone:

@@ -17,7 +17,8 @@
         },
         "bump-gitops": { "stage": "gitops" }
       },
-      "workload": { "namespace": "default", "deployment": "personal-site" }
+      "workload": { "namespace": "default", "deployment": "personal-site" },
+      "verify": { "url": "https://brendanmanley.com/healthz", "max_latency_ms": 3000 }
     }
   ]
 }

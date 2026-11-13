@@ -6,12 +6,12 @@ verified public response, with each stage backed by its own evidence. A green
 CI run, an Argo CD sync, a Ready pod and a passing public check are four
 separate facts; mybuilds never treats one as proof of another.
 
-**Status: M2, Rollout stage.** The server receives signed GitHub, CI and
-Argo CD events, watches its workloads through read-only Kubernetes informers,
-stores each delivery and observation once, projects releases from Source
-through Rollout, streams changes over SSE and serves the React pipeline view.
-It runs on the cluster it watches. Verify and config-change releases are
-next. `demo/index.html` is the standalone UI prototype the view was built
+**Status: M2, Verify stage.** The server receives signed GitHub, CI and Argo
+CD events, watches its workloads through read-only Kubernetes informers,
+checks each release's public URL, stores every delivery, observation and
+check once, projects releases from Source through Verify, streams changes
+over SSE and serves the React pipeline view. It runs on the cluster it
+watches. Config-change releases are next. `demo/index.html` is the standalone UI prototype the view was built
 from.
 
 ## Layout
@@ -25,6 +25,7 @@ internal/ingest        authenticate, translate, store, re-project
   github, ci, argocd   one translator per provider
   verify               HMAC and bearer-token checks
 internal/kube          read-only informers: Deployments, ReplicaSets, Pods
+internal/verifier      public checks after Rollout
 internal/releases      release model, correlation and the projector
 internal/services      service map: repositories, workflows, jobs, apps
 internal/httpapi       health, read API, SSE stream, ingestion routes, static files, metrics
@@ -32,11 +33,12 @@ internal/fixtures      sample releases and the recorded release replayed in fixt
 web/                   React + TypeScript frontend (Vite); dist/ is embedded into the binary
 docs/ingestion.md      the three ingestion contracts
 docs/runtime.md        the runtime watch and the Rollout stage
+docs/verification.md   the verifier and the Verify stage
 demo/                  standalone UI prototype
 ```
 
 Planned, not yet present: `internal/ingest/queue` (SQS consumer),
-`internal/verify`, `worker/` (Cloudflare Worker) and `drill/`.
+`worker/` (Cloudflare Worker) and `drill/`.
 
 ## How events become releases
 
@@ -53,7 +55,8 @@ Each stage completes only on its own evidence (plan section 5.5): Source on
 the workflow run, Build on the signed release manifest or its job's steps,
 Publish on `release.published`, GitOps on `gitops.updated` (or is skipped on
 `gitops.superseded`), Reconcile on the service's own Argo CD sync, Rollout on
-the workload's pods running the release digest. A stage with no evidence
+the workload's pods running the release digest, Verify on 5 consecutive
+public checks that serve the release's `X-Release-ID`. A stage with no evidence
 before one that has started shows `unknown`.
 
 Rollout evidence is attributed through Argo CD, not through pod annotations:
@@ -106,6 +109,7 @@ health endpoints to the Go server on :8080.
 | `MYBUILDS_CI_EVENT_SECRET` | unset | Enables `POST /api/v1/ci-events` |
 | `MYBUILDS_ARGOCD_TOKEN` | unset | Enables `POST /hooks/argocd` |
 | `MYBUILDS_RUNTIME_WATCH` | `auto` | `auto` watches Kubernetes when running in a cluster; `off` disables it |
+| `MYBUILDS_VERIFIER` | `auto` | `auto` checks public URLs unless in fixture mode; `off` disables it |
 | `MYBUILDS_SERVICES_FILE` | built-in | Service map JSON; the built-in one is `internal/services/services.json` |
 
 An ingestion endpoint whose secret is unset answers `503`. Secrets are never
