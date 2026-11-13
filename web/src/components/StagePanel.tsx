@@ -122,10 +122,16 @@ function whereRows(r: Release, st: Stage, svc?: Service): Row[] {
       push("Digest", r.artifact_digest ? shortDigest(r.artifact_digest) : undefined, true);
       push("Evidence", "Read-only watch of the Deployment, ReplicaSets and pods");
       break;
-    case "verify":
-      push("Check", "GET /healthz, X-Release-ID", true);
-      push("Evidence", "Verifier samples (M2)");
+    case "verify": {
+      const v = svc?.verify;
+      push("Endpoint", v?.url, true);
+      push("Passes", v ? `5 in a row, 30 s apart, within ${Math.round(v.window_seconds / 60)} min` : undefined);
+      push("Limits", v ? `HTTP ${v.allowed_status.join(", ")}, under ${v.max_latency_ms} ms` : undefined, true);
+      push("Health body", v?.health_body, true);
+      push("Expected", r.release_id, true);
+      push("Evidence", "Public checks through Cloudflare: X-Release-ID, cf-ray");
       break;
+    }
   }
   if (st.failure_reason) rows.push(["Reason", st.failure_reason]);
   return rows;

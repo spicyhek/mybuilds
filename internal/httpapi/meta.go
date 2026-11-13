@@ -28,6 +28,16 @@ type serviceView struct {
 	ArgoCDApplication string `json:"argocd_application,omitempty"`
 	// Workload is the Deployment the Rollout stage watches.
 	Workload *workloadView `json:"workload,omitempty"`
+	// Verify is the public check of the Verify stage.
+	Verify *verifyView `json:"verify,omitempty"`
+}
+
+type verifyView struct {
+	URL           string `json:"url"`
+	AllowedStatus []int  `json:"allowed_status"`
+	MaxLatencyMS  int64  `json:"max_latency_ms"`
+	WindowSeconds int64  `json:"window_seconds"`
+	HealthBody    string `json:"health_body,omitempty"`
 }
 
 type workloadView struct {
@@ -48,8 +58,17 @@ func toServiceView(svc services.Service) serviceView {
 	if w := svc.Workload; w != nil {
 		workload = &workloadView{Namespace: w.Namespace, Deployment: w.Deployment}
 	}
+	var verify *verifyView
+	if v := svc.Verify; v != nil {
+		verify = &verifyView{URL: v.URL, AllowedStatus: v.Status(), MaxLatencyMS: v.MaxLatency().Milliseconds(),
+			WindowSeconds: int64(v.Window().Seconds())}
+		if h := v.HealthBody; h != nil {
+			verify.HealthBody = h.Field + " = " + h.Value
+		}
+	}
 	return serviceView{
 		Workload:          workload,
+		Verify:            verify,
 		Name:              svc.Name,
 		Environment:       svc.Environment,
 		Repository:        svc.Repository,

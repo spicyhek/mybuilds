@@ -142,7 +142,9 @@ function waitingOn(r: Release, st: Stage): string | null {
         ? `Waiting for ${r.service} pods to roll out`
         : null;
     case "verify":
-      return "Verification arrives with the verifier (M2)";
+      return r.stages.find((s) => s.key === "rollout")?.state === "succeeded"
+        ? "Waiting for the first public check"
+        : null;
     case "build":
       return st.state === "running" && !st.steps?.length ? "Waiting for the build job to start" : null;
     default:

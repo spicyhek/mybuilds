@@ -32,6 +32,9 @@ type Config struct {
 	// RuntimeWatch is "auto", which starts the Kubernetes watch when running
 	// in a cluster, or "off".
 	RuntimeWatch string
+	// Verifier is "auto", which runs the public checks unless in fixture
+	// mode, or "off".
+	Verifier string
 }
 
 // String hides the secrets, so a logged Config never leaks them.
@@ -60,6 +63,10 @@ func FromEnv() (Config, error) {
 		CIEventSecret:       os.Getenv("MYBUILDS_CI_EVENT_SECRET"),
 		ArgoCDToken:         os.Getenv("MYBUILDS_ARGOCD_TOKEN"),
 		RuntimeWatch:        envOr("MYBUILDS_RUNTIME_WATCH", "auto"),
+		Verifier:            envOr("MYBUILDS_VERIFIER", "auto"),
+	}
+	if cfg.Verifier != "auto" && cfg.Verifier != "off" {
+		return cfg, fmt.Errorf("MYBUILDS_VERIFIER: %q is not auto or off", cfg.Verifier)
 	}
 	if cfg.RuntimeWatch != "auto" && cfg.RuntimeWatch != "off" {
 		return cfg, fmt.Errorf("MYBUILDS_RUNTIME_WATCH: %q is not auto or off", cfg.RuntimeWatch)

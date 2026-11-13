@@ -27,6 +27,7 @@ import (
 	"github.com/spicyhek/mybuilds/internal/releases"
 	"github.com/spicyhek/mybuilds/internal/services"
 	"github.com/spicyhek/mybuilds/internal/storage"
+	"github.com/spicyhek/mybuilds/internal/verifier"
 	"github.com/spicyhek/mybuilds/web"
 )
 
@@ -118,6 +119,23 @@ func run() error {
 		"argocd", cfg.ArgoCDToken != "")
 
 	startRuntimeWatch(ctx, cfg, logger, svcs, store, projector, hub)
+
+	// The verifier checks public URLs for real releases; fixture mode has
+	// none.
+	if cfg.Verifier == "off" || cfg.Fixtures {
+		logger.Info("verifier disabled", "setting", cfg.Verifier, "fixtures", cfg.Fixtures)
+	} else {
+		v := verifier.New(verifier.Options{
+			Store:      store,
+			Projector:  projector,
+			Services:   svcs,
+			Notify:     hub.Notify,
+			Logger:     logger,
+			Registerer: prometheus.DefaultRegisterer,
+			Checker:    verifier.Checker{UserAgent: "mybuilds-verifier/" + version},
+		})
+		go v.Run(ctx)
+	}
 
 	if cfg.Fixtures {
 		go func() {

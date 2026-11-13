@@ -66,6 +66,13 @@ export interface Service {
   gitops_path?: string;
   argocd_application?: string;
   workload?: { namespace: string; deployment: string };
+  verify?: {
+    url: string;
+    allowed_status: number[];
+    max_latency_ms: number;
+    window_seconds: number;
+    health_body?: string;
+  };
 }
 
 export interface Meta {

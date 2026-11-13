@@ -19,6 +19,8 @@ const (
 	// ProviderKubernetes is the runtime watch, not a webhook (plan section
 	// 8.4).
 	ProviderKubernetes = "kubernetes"
+	// ProviderVerifier is mybuilds' own public check (plan section 8.5).
+	ProviderVerifier = "verifier"
 )
 
 // Event types.
@@ -32,6 +34,8 @@ const (
 	TypeDeployment       = "k8s.deployment"
 	TypeReplicaSet       = "k8s.replicaset"
 	TypePod              = "k8s.pod"
+	TypeVerifyCheck      = "verifier.check"
+	TypeVerifyEnded      = "verifier.ended"
 )
 
 // Event is one stored observation.
@@ -281,4 +285,60 @@ type ContainerStatus struct {
 	State     string     `json:"state,omitempty"`
 	Reason    string     `json:"reason,omitempty"`
 	StartedAt *time.Time `json:"started_at,omitempty"`
+}
+
+// Verification check results.
+const (
+	// CheckPass counts toward the five consecutive passes.
+	CheckPass = "pass"
+	// CheckMismatch is a response with another release's X-Release-ID, such
+	// as from an old replica. It resets the count.
+	CheckMismatch = "mismatch"
+	// CheckUnhealthy is a health body that is not healthy or cannot be
+	// parsed. It resets the count.
+	CheckUnhealthy = "unhealthy"
+	// CheckFail is any other failure: DNS, TLS, connection, timeout, status
+	// code or latency. It fails Verify.
+	CheckFail = "fail"
+)
+
+// VerifyCheck is one public check of a release (plan section 8.5). The
+// result is decided when the check runs, against the service map of that
+// time, so replaying it gives the same Verify outcome.
+type VerifyCheck struct {
+	ReleaseID string    `json:"release_id"`
+	Endpoint  string    `json:"endpoint"`
+	CheckedAt time.Time `json:"checked_at"`
+	Result    string    `json:"result"`
+	// Reason explains a result other than pass. It is built from the fields
+	// below, never copied from an error message.
+	Reason string `json:"reason,omitempty"`
+
+	DNSOK        bool       `json:"dns_ok"`
+	TLSOK        bool       `json:"tls_ok"`
+	TLSVersion   string     `json:"tls_version,omitempty"`
+	CertNotAfter *time.Time `json:"cert_not_after,omitempty"`
+	StatusCode   int        `json:"status_code,omitempty"`
+	LatencyMS    int64      `json:"latency_ms,omitempty"`
+	// ObservedReleaseID is the response's X-Release-ID header.
+	ObservedReleaseID string `json:"observed_release_id,omitempty"`
+	// Colo is the Cloudflare location from the cf-ray header, such as LAX.
+	Colo        string `json:"colo,omitempty"`
+	CacheStatus string `json:"cache_status,omitempty"`
+	// HealthOK is the health-body check's result, nil when the service has
+	// none. The body itself is not stored.
+	HealthOK *bool `json:"health_ok,omitempty"`
+}
+
+// Reasons a verification window ends without five consecutive passes.
+const (
+	EndExpired    = "expired"
+	EndSuperseded = "superseded"
+)
+
+// VerifyEnded closes a release's verification window.
+type VerifyEnded struct {
+	ReleaseID  string    `json:"release_id"`
+	Reason     string    `json:"reason"`
+	OccurredAt time.Time `json:"occurred_at"`
 }
