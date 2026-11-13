@@ -37,7 +37,13 @@ export function ReleaseRow({ release: r, now, selected, onSelect }: Props) {
             {shortSha(sha)}
           </span>
         </span>
-        <span className="rel-l2">{r.drill && r.drill_scenario ? `scenario: ${r.drill_scenario}` : r.release_id}</span>
+        <span className="rel-l2">
+          {r.drill && r.drill_scenario
+            ? `scenario: ${r.drill_scenario}`
+            : r.kind === "config" && r.gitops_subject
+              ? r.gitops_subject
+              : r.release_id}
+        </span>
       </span>
       <span className="c-pipe" role="cell">
         <MiniPipeline release={r} />

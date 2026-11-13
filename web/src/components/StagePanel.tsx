@@ -109,7 +109,11 @@ function whereRows(r: Release, st: Stage, svc?: Service): Row[] {
       push("Path", svc?.gitops_path, true);
       push("Job", st.key === "gitops" ? "bump-gitops" : undefined, true);
       push("Commit", r.gitops_sha ? shortSha(r.gitops_sha) : undefined, true);
-      push("Evidence", st.key === "gitops" ? "CI-signed gitops.updated" : "GitOps commit");
+      if (st.key === "gitops_commit") push("Author", r.gitops_author);
+      push(
+        "Evidence",
+        st.key === "gitops" ? "CI-signed gitops.updated" : "Argo CD commit metadata: no Release-Id trailer, so no CI run made it",
+      );
       break;
     case "reconcile":
       push("Application", svc?.argocd_application ?? r.service, true);
@@ -120,6 +124,7 @@ function whereRows(r: Release, st: Stage, svc?: Service): Row[] {
       push("Namespace", svc?.workload?.namespace, true);
       push("Deployment", svc?.workload?.deployment, true);
       push("Digest", r.artifact_digest ? shortDigest(r.artifact_digest) : undefined, true);
+      push("Serving", r.runtime_release_id, true);
       push("Evidence", "Read-only watch of the Deployment, ReplicaSets and pods");
       break;
     case "verify": {
@@ -128,7 +133,7 @@ function whereRows(r: Release, st: Stage, svc?: Service): Row[] {
       push("Passes", v ? `5 in a row, 30 s apart, within ${Math.round(v.window_seconds / 60)} min` : undefined);
       push("Limits", v ? `HTTP ${v.allowed_status.join(", ")}, under ${v.max_latency_ms} ms` : undefined, true);
       push("Health body", v?.health_body, true);
-      push("Expected", r.release_id, true);
+      push("Expected", r.kind === "config" ? r.runtime_release_id : r.release_id, true);
       push("Evidence", "Public checks through Cloudflare: X-Release-ID, cf-ray");
       break;
     }

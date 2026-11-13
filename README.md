@@ -6,12 +6,13 @@ verified public response, with each stage backed by its own evidence. A green
 CI run, an Argo CD sync, a Ready pod and a passing public check are four
 separate facts; mybuilds never treats one as proof of another.
 
-**Status: M2, Verify stage.** The server receives signed GitHub, CI and Argo
+**Status: M2, config releases.** The server receives signed GitHub, CI and Argo
 CD events, watches its workloads through read-only Kubernetes informers,
 checks each release's public URL, stores every delivery, observation and
 check once, projects releases from Source through Verify, streams changes
 over SSE and serves the React pipeline view. It runs on the cluster it
-watches. Config-change releases are next. `demo/index.html` is the standalone UI prototype the view was built
+watches. Human edits in homelab-infra become config releases with their own
+rollout and verification. `demo/index.html` is the standalone UI prototype the view was built
 from.
 
 ## Layout
@@ -34,6 +35,7 @@ web/                   React + TypeScript frontend (Vite); dist/ is embedded int
 docs/ingestion.md      the three ingestion contracts
 docs/runtime.md        the runtime watch and the Rollout stage
 docs/verification.md   the verifier and the Verify stage
+docs/config-releases.md config releases: GitOps commits no CI run made
 demo/                  standalone UI prototype
 ```
 
@@ -58,6 +60,11 @@ Publish on `release.published`, GitOps on `gitops.updated` (or is skipped on
 the workload's pods running the release digest, Verify on 5 consecutive
 public checks that serve the release's `X-Release-ID`. A stage with no evidence
 before one that has started shows `unknown`.
+
+A synced GitOps commit without a `Release-Id:` trailer was not made by CI,
+so it becomes a config release (`<service>/config-<short-sha>/<environment>`)
+with the GitOps commit, Reconcile, Rollout and Verify stages. See
+[`docs/config-releases.md`](docs/config-releases.md).
 
 Rollout evidence is attributed through Argo CD, not through pod annotations:
 a release owns its workload's runtime events from the sync of its GitOps

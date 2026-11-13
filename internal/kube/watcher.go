@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -87,6 +88,15 @@ type Watcher struct {
 
 	observed *prometheus.CounterVec
 	synced   prometheus.Gauge
+	syncedAt atomic.Pointer[time.Time]
+}
+
+// SyncedAt returns when the informers completed their initial list.
+func (w *Watcher) SyncedAt() (time.Time, bool) {
+	if t := w.syncedAt.Load(); t != nil {
+		return *t, true
+	}
+	return time.Time{}, false
 }
 
 type change struct {
@@ -195,6 +205,8 @@ func (w *Watcher) Run(ctx context.Context) error {
 		synced[i] = inf.HasSynced
 	}
 	if cache.WaitForCacheSync(ctx.Done(), synced...) {
+		now := w.opts.Now()
+		w.syncedAt.Store(&now)
 		w.synced.Set(1)
 		w.opts.Logger.Info("runtime watch synced")
 	}

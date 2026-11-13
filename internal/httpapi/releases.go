@@ -32,6 +32,9 @@ type releaseView struct {
 	ArtifactDigest   string      `json:"artifact_digest,omitempty"`
 	GitOpsRepository string      `json:"gitops_repository,omitempty"`
 	GitOpsSHA        string      `json:"gitops_sha,omitempty"`
+	GitOpsSubject    string      `json:"gitops_subject,omitempty"`
+	GitOpsAuthor     string      `json:"gitops_author,omitempty"`
+	RuntimeReleaseID string      `json:"runtime_release_id,omitempty"`
 	Status           string      `json:"status"`
 	CreatedAt        time.Time   `json:"created_at"`
 	CompletedAt      *time.Time  `json:"completed_at,omitempty"`
@@ -111,6 +114,9 @@ func toView(r releases.Release) releaseView {
 		ArtifactDigest:   r.ArtifactDigest,
 		GitOpsRepository: r.GitOpsRepository,
 		GitOpsSHA:        r.GitOpsSHA,
+		GitOpsSubject:    r.GitOpsSubject,
+		GitOpsAuthor:     r.GitOpsAuthor,
+		RuntimeReleaseID: r.RuntimeReleaseID,
 		Status:           string(r.Status),
 		CreatedAt:        r.CreatedAt,
 		CompletedAt:      r.CompletedAt,

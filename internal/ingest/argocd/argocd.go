@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/spicyhek/mybuilds/internal/events"
+	"github.com/spicyhek/mybuilds/internal/releases"
+	"github.com/spicyhek/mybuilds/internal/services"
 )
 
 var fullSHA = regexp.MustCompile(`^[0-9a-f]{40}$`)
@@ -33,7 +35,12 @@ type payload struct {
 // Translate validates a notification and turns it into an event. Argo CD
 // sends no delivery ID, so the body hash is used: an identical notification
 // is the same observation.
-func Translate(body []byte, bodySHA256 string) (*events.Event, error) {
+//
+// A sync of a service's own Application whose commit has no Release-Id
+// trailer was not made by CI: it names a config release (plan section 8.7).
+// A commit whose metadata is missing names nothing, since it cannot be told
+// apart from a CI commit.
+func Translate(body []byte, bodySHA256 string, svcs services.Map) (*events.Event, error) {
 	var p payload
 	if err := json.Unmarshal(body, &p); err != nil {
 		return nil, fmt.Errorf("decode Argo CD notification: %w", err)
@@ -89,9 +96,20 @@ func Translate(body []byte, bodySHA256 string) (*events.Event, error) {
 		Type:       events.TypeArgoCD,
 		Attempt:    1,
 		OccurredAt: occurred,
-		Keys:       events.Keys{Revision: p.Revision},
+		Keys:       events.Keys{ReleaseID: configRelease(out, svcs), Revision: p.Revision},
 		Payload:    data,
 	}, nil
+}
+
+func configRelease(n events.ArgoCDNotification, svcs services.Map) string {
+	if n.Trigger == events.TriggerHealthDegraded || n.CommitSubject == "" || n.CommitReleaseID != "" {
+		return ""
+	}
+	svc, ok := svcs.ByApplication(n.Application)
+	if !ok {
+		return ""
+	}
+	return releases.ConfigReleaseID(svc.Name, svc.Environment, n.Revision)
 }
 
 func optionalTime(field, s string) (*time.Time, error) {

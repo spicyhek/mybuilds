@@ -202,6 +202,7 @@ func TestVerifierClosesAWindowThatPassedUnchecked(t *testing.T) {
 // fakeStore records what the verifier stores for given candidates.
 type fakeStore struct {
 	cands  []storage.VerifyCandidate
+	idle   []storage.IdleCandidate
 	stored []events.Event
 }
 
@@ -214,6 +215,10 @@ func (f *fakeStore) VerifyCandidates(context.Context) ([]storage.VerifyCandidate
 	return f.cands, nil
 }
 
+func (f *fakeStore) IdleConfigReleases(context.Context) ([]storage.IdleCandidate, error) {
+	return f.idle, nil
+}
+
 type nopProjector struct{}
 
 func (nopProjector) ProjectEvent(context.Context, events.Event) ([]releases.Outcome, error) {
@@ -224,8 +229,8 @@ func TestVerifierEndsOlderReleases(t *testing.T) {
 	srv, c := newServer(t, &response{status: 200, release: "personal-site/bbbbbbb/production/58"})
 	e := newEnv(t, srv.URL+"/healthz")
 	fs := &fakeStore{cands: []storage.VerifyCandidate{
-		{ReleaseID: "personal-site/aaaaaaa/production/57", Service: "personal-site", RolloutCompletedAt: at(0)},
-		{ReleaseID: "personal-site/bbbbbbb/production/58", Service: "personal-site", RolloutCompletedAt: at(200)},
+		{ReleaseID: "personal-site/aaaaaaa/production/57", Service: "personal-site", RolloutCompletedAt: at(0), Expected: "personal-site/aaaaaaa/production/57"},
+		{ReleaseID: "personal-site/bbbbbbb/production/58", Service: "personal-site", RolloutCompletedAt: at(200), Expected: "personal-site/bbbbbbb/production/58"},
 	}}
 	now := at(210)
 	v := New(Options{Store: fs, Projector: nopProjector{}, Services: e.svcs, Checker: c, Logger: discard,
@@ -249,3 +254,67 @@ func TestVerifierEndsOlderReleases(t *testing.T) {
 }
 
 var discard = slog.New(slog.NewTextHandler(io.Discard, nil))
+
+func TestVerifierChecksAConfigReleaseAgainstItsPods(t *testing.T) {
+	served := "personal-site/aaaaaaa/production/57"
+	cfg := "personal-site/config-ccccccc/production"
+	srv, c := newServer(t, &response{status: 200, release: served})
+	e := newEnv(t, srv.URL+"/healthz")
+	fs := &fakeStore{cands: []storage.VerifyCandidate{
+		{ReleaseID: cfg, Service: "personal-site", RolloutCompletedAt: at(0), Expected: served},
+	}}
+	now := at(10)
+	v := New(Options{Store: fs, Projector: nopProjector{}, Services: e.svcs, Checker: c, Logger: discard,
+		Now: func() time.Time { return now }})
+	if err := v.Step(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(fs.stored) != 1 || fs.stored[0].Keys.ReleaseID != cfg {
+		t.Fatalf("stored %+v", fs.stored)
+	}
+	var check events.VerifyCheck
+	json.Unmarshal(fs.stored[0].Payload, &check)
+	if check.Result != events.CheckPass || check.ReleaseID != cfg || check.ExpectedReleaseID != served {
+		t.Errorf("check %+v", check)
+	}
+}
+
+func TestVerifierRecordsSyncsThatReplacedNoPods(t *testing.T) {
+	cfg := "personal-site/config-ccccccc/production"
+	idle := []storage.IdleCandidate{{ReleaseID: cfg, Service: "personal-site",
+		ReconcileStartedAt: at(100), ReconcileDoneAt: at(103)}}
+	cases := []struct {
+		name     string
+		synced   *time.Time
+		now      time.Time
+		recorded bool
+	}{
+		{"watch running throughout", ptrTime(at(0)), at(163), true},
+		{"within the grace period", ptrTime(at(0)), at(162), false},
+		{"watch started after the sync", ptrTime(at(101)), at(500), false},
+		{"no watch", nil, at(500), false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fs := &fakeStore{idle: idle}
+			o := Options{Store: fs, Projector: nopProjector{}, Logger: discard, Now: func() time.Time { return tc.now }}
+			if tc.synced != nil {
+				o.WatchSyncedAt = func() (time.Time, bool) { return *tc.synced, true }
+			}
+			if err := New(o).Step(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			if got := len(fs.stored) == 1; got != tc.recorded {
+				t.Fatalf("recorded %t (%d events), want %t", got, len(fs.stored), tc.recorded)
+			}
+			if tc.recorded {
+				ev := fs.stored[0]
+				if ev.Type != events.TypeNoRollout || ev.Keys.ReleaseID != cfg || !ev.OccurredAt.Equal(at(163)) {
+					t.Errorf("event %s %s at %v", ev.Type, ev.Keys.ReleaseID, ev.OccurredAt)
+				}
+			}
+		})
+	}
+}
+
+func ptrTime(t time.Time) *time.Time { return &t }

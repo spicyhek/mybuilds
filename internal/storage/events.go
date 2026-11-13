@@ -188,7 +188,7 @@ func (s *Store) SaveProjection(ctx context.Context, p releases.Projection) (crea
 		uuid = releases.NewUUID()
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO releases (`+releaseColumns+`)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			append([]any{uuid}, releaseValues(r)...)...); err != nil {
 			return false, fmt.Errorf("insert release: %w", err)
 		}
@@ -199,7 +199,8 @@ func (s *Store) SaveProjection(ctx context.Context, p releases.Projection) (crea
 			UPDATE releases SET release_id = ?, service = ?, environment = ?, kind = ?, template = ?,
 				deployed_with = ?, drill = ?, drill_scenario = ?, superseded = ?,
 				source_repository = ?, source_sha = ?, artifact = ?, artifact_digest = ?,
-				gitops_repository = ?, gitops_sha = ?, status = ?, created_at = ?, completed_at = ?, verified_at = ?
+				gitops_repository = ?, gitops_sha = ?, status = ?, created_at = ?, completed_at = ?, verified_at = ?,
+				gitops_subject = ?, gitops_author = ?, runtime_release_id = ?
 			WHERE uuid = ?`,
 			append(releaseValues(r), uuid)...); err != nil {
 			return false, fmt.Errorf("update release: %w", err)

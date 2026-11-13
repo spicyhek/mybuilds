@@ -36,6 +36,7 @@ const (
 	TypePod              = "k8s.pod"
 	TypeVerifyCheck      = "verifier.check"
 	TypeVerifyEnded      = "verifier.ended"
+	TypeNoRollout        = "verifier.no_rollout"
 )
 
 // Event is one stored observation.
@@ -306,10 +307,13 @@ const (
 // result is decided when the check runs, against the service map of that
 // time, so replaying it gives the same Verify outcome.
 type VerifyCheck struct {
-	ReleaseID string    `json:"release_id"`
-	Endpoint  string    `json:"endpoint"`
-	CheckedAt time.Time `json:"checked_at"`
-	Result    string    `json:"result"`
+	ReleaseID string `json:"release_id"`
+	// ExpectedReleaseID is the X-Release-ID the check expected when it is
+	// not ReleaseID: a config release's pods serve an application release.
+	ExpectedReleaseID string    `json:"expected_release_id,omitempty"`
+	Endpoint          string    `json:"endpoint"`
+	CheckedAt         time.Time `json:"checked_at"`
+	Result            string    `json:"result"`
 	// Reason explains a result other than pass. It is built from the fields
 	// below, never copied from an error message.
 	Reason string `json:"reason,omitempty"`
@@ -341,4 +345,13 @@ type VerifyEnded struct {
 	ReleaseID  string    `json:"release_id"`
 	Reason     string    `json:"reason"`
 	OccurredAt time.Time `json:"occurred_at"`
+}
+
+// NoRollout records that a config release's sync replaced no pods: the
+// runtime watch was running throughout and saw no change to the workload
+// within the grace period after the sync finished.
+type NoRollout struct {
+	ReleaseID    string    `json:"release_id"`
+	GraceSeconds int       `json:"grace_seconds"`
+	OccurredAt   time.Time `json:"occurred_at"`
 }

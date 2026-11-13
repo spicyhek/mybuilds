@@ -25,6 +25,10 @@ A service opts in with a `verify` entry in the service map:
 | `health_body` | none | `{"field": "status", "value": "ok"}`: a top-level JSON field that must equal the value |
 
 Without `verify`, Verify is skipped once Rollout succeeds.
+
+A config release's checks expect the `X-Release-ID` of the application
+release its pods carry in their `release-id` annotation, not the config
+release's own ID. See [`config-releases.md`](config-releases.md).
 `MYBUILDS_VERIFIER=off` stops the checks; fixture mode never runs them.
 
 ## One check

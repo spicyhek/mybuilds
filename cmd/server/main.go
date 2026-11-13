@@ -118,14 +118,14 @@ func run() error {
 		"ci", cfg.CIEventSecret != "",
 		"argocd", cfg.ArgoCDToken != "")
 
-	startRuntimeWatch(ctx, cfg, logger, svcs, store, projector, hub)
+	watcher := startRuntimeWatch(ctx, cfg, logger, svcs, store, projector, hub)
 
 	// The verifier checks public URLs for real releases; fixture mode has
 	// none.
 	if cfg.Verifier == "off" || cfg.Fixtures {
 		logger.Info("verifier disabled", "setting", cfg.Verifier, "fixtures", cfg.Fixtures)
 	} else {
-		v := verifier.New(verifier.Options{
+		opts := verifier.Options{
 			Store:      store,
 			Projector:  projector,
 			Services:   svcs,
@@ -133,7 +133,11 @@ func run() error {
 			Logger:     logger,
 			Registerer: prometheus.DefaultRegisterer,
 			Checker:    verifier.Checker{UserAgent: "mybuilds-verifier/" + version},
-		})
+		}
+		if watcher != nil {
+			opts.WatchSyncedAt = watcher.SyncedAt
+		}
+		v := verifier.New(opts)
 		go v.Run(ctx)
 	}
 
@@ -220,15 +224,15 @@ func run() error {
 // running in a cluster (plan section 8.4). Outside one, or in fixture mode,
 // releases stop at Reconcile.
 func startRuntimeWatch(ctx context.Context, cfg config.Config, logger *slog.Logger, svcs services.Map,
-	store *storage.Store, projector *releases.Projector, hub *httpapi.Hub) {
+	store *storage.Store, projector *releases.Projector, hub *httpapi.Hub) *kube.Watcher {
 	if cfg.RuntimeWatch == "off" || cfg.Fixtures {
 		logger.Info("runtime watch disabled", "setting", cfg.RuntimeWatch, "fixtures", cfg.Fixtures)
-		return
+		return nil
 	}
 	restConfig, err := rest.InClusterConfig()
 	if err != nil {
 		logger.Info("runtime watch disabled: not running in a cluster", "reason", err.Error())
-		return
+		return nil
 	}
 	restConfig.UserAgent = "mybuilds/" + version
 	watcher, err := kube.New(kube.Options{
@@ -242,13 +246,14 @@ func startRuntimeWatch(ctx context.Context, cfg config.Config, logger *slog.Logg
 	})
 	if err != nil {
 		logger.Error("runtime watch disabled", "error", err)
-		return
+		return nil
 	}
 	go func() {
 		if err := watcher.Run(ctx); err != nil {
 			logger.Error("runtime watch stopped", "error", err)
 		}
 	}()
+	return watcher
 }
 
 func randomSecret() string {

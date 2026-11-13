@@ -44,10 +44,15 @@ type endObs struct {
 //     health body was the only thing in the way, and failed otherwise. With
 //     no failed check to blame, such as when mybuilds was down for the
 //     window, it is unknown.
-func (f *fold) verify(st *Stage) ([]Step, []Sample) {
+func (f *fold) verify(st *Stage, r Release) ([]Step, []Sample) {
 	if f.svc.Verify == nil && len(f.checks) == 0 {
 		st.State = StateSkipped
 		st.Summary = "No public check is configured for this service"
+		return nil, nil
+	}
+	if r.Kind == KindConfig && r.RuntimeReleaseID == "" && len(f.checks) == 0 {
+		st.State = StateSkipped
+		st.Summary = "The new pods carry no release-id annotation to check X-Release-ID against"
 		return nil, nil
 	}
 

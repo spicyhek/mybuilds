@@ -52,8 +52,8 @@ pod template's `release-id` annotation (plan section 8.7, rule 1):
    already succeeded or failed. When the notification arrives, the window
    closes and both releases are re-projected.
 
-Config-only commits and sync attribution rules 2 and 3 come with
-config-change releases.
+A sync of a commit no CI run made belongs to a config release, which owns
+the window the same way. See [`config-releases.md`](config-releases.md).
 
 ## Rollout rules
 
