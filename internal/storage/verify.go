@@ -35,6 +35,9 @@ func (s *Store) VerifyCandidates(ctx context.Context) ([]VerifyCandidate, error)
 		JOIN release_stages v  ON v.release_uuid = r.uuid AND v.stage_key = 'verify'
 		WHERE ro.state = 'succeeded' AND ro.completed_at IS NOT NULL
 			AND v.state IN ('pending', 'running')
+			-- A config release deployed together with an application release
+			-- shares that release's checks.
+			AND NOT (r.kind = 'config' AND r.deployed_with_release IS NOT NULL)
 		ORDER BY ro.completed_at, r.release_id`, events.TypeVerifyCheck)
 	if err != nil {
 		return nil, fmt.Errorf("verify candidates: %w", err)

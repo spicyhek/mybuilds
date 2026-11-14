@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -247,7 +248,15 @@ func (h *harness) configSync(gitops string, started, finished int) string {
 
 func (h *harness) rollout(hash, revision string, base int, digest string) {
 	gen := int64(50 + base)
-	h.observe(base+1, deployment(revision, gen, gen, 3, 1, 2, "ReplicaSetUpdated", base+1))
+	// The Deployment's pod template matches the new ReplicaSet's.
+	dep := func(d *appsv1.Deployment) *appsv1.Deployment {
+		d.Spec.Template.Spec.Containers[0].Image = image + "@" + digest
+		if h.serving != "" {
+			d.Spec.Template.Annotations[releaseIDAnnotation] = h.serving
+		}
+		return d
+	}
+	h.observe(base+1, dep(deployment(revision, gen, gen, 3, 1, 2, "ReplicaSetUpdated", base+1)))
 	rs := replicaSet(hash, revision, base+1)
 	rs.Spec.Template.Spec.Containers[0].Image = image + "@" + digest
 	if h.serving != "" {
@@ -258,7 +267,7 @@ func (h *harness) rollout(hash, revision string, base int, digest string) {
 	h.observe(base+8, pod(hash, "a", base+1, base+8, digest))
 	h.observe(base+9, pod(hash, "b", base+8, 0, digest))
 	h.observe(base+13, pod(hash, "b", base+8, base+13, digest))
-	h.observe(base+15, deployment(revision, gen, gen, 2, 2, 2, "NewReplicaSetAvailable", base+14))
+	h.observe(base+15, dep(deployment(revision, gen, gen, 2, 2, 2, "NewReplicaSetAvailable", base+14)))
 }
 
 func (h *harness) rolloutStage(id string) releases.Stage {
@@ -314,7 +323,9 @@ func TestWatcherAttributesRolloutsBySyncWindow(t *testing.T) {
 	// Seeing the same objects again, as after a restart, stores nothing,
 	// and a rebuild gives the same result.
 	total, _, _ := h.store.CountEvents(h.ctx)
-	h.observe(5000, deployment("12", 250, 250, 2, 2, 2, "NewReplicaSetAvailable", 214))
+	same := deployment("12", 250, 250, 2, 2, 2, "NewReplicaSetAvailable", 214)
+	same.Spec.Template.Spec.Containers[0].Image = image + "@" + digestOf('b')
+	h.observe(5000, same)
 	if again, _, _ := h.store.CountEvents(h.ctx); again != total {
 		t.Errorf("an unchanged object stored a new event: %d -> %d", total, again)
 	}
@@ -411,5 +422,177 @@ func TestConfigChangeLeavesTheApplicationReleaseUnchanged(t *testing.T) {
 	}
 	if st := h.rolloutStage(cfg); st.State != releases.StateSucceeded {
 		t.Errorf("config release after rebuild: %s", st.State)
+	}
+}
+
+func (h *harness) get(id string) *releases.Release {
+	h.t.Helper()
+	r, err := h.store.GetRelease(h.ctx, id)
+	if err != nil {
+		h.t.Fatalf("release %s: %v", id, err)
+	}
+	return r
+}
+
+func stageOf(r *releases.Release, key string) releases.Stage {
+	for _, st := range r.Stages {
+		if st.Key == key {
+			return st
+		}
+	}
+	return releases.Stage{}
+}
+
+// TestDeployedTogether covers rule 2 of plan section 8.7: a human commit
+// lands on top of a digest bump before Argo CD syncs, so the bump's own
+// commit is never synced.
+func TestDeployedTogether(t *testing.T) {
+	g1 := strings.Repeat("1", 40)
+	g2 := strings.Repeat("2", 40) // the bump for release 12
+	g3 := strings.Repeat("e", 40) // the human commit on top
+
+	for _, order := range []string{"sync first", "pods first"} {
+		t.Run(order, func(t *testing.T) {
+			h := newHarness(t)
+			r11 := h.release(11, strings.Repeat("a", 40), g1, digestOf('a'), 0)
+			h.serving = r11
+			h.sync(g1, 100, 104)
+			h.rollout("aaaaaaaaaa", "11", 100, digestOf('a'))
+
+			r12 := h.release(12, strings.Repeat("b", 40), g2, digestOf('b'), 150)
+			h.serving = r12
+			cfg := releases.ConfigReleaseID("personal-site", "production", g3)
+			if order == "sync first" {
+				h.configSync(g3, 200, 203)
+				h.rollout("bbbbbbbbbb", "12", 200, digestOf('b'))
+			} else {
+				// The runtime watch sees the pods before Argo CD's
+				// notification arrives.
+				h.rollout("bbbbbbbbbb", "12", 200, digestOf('b'))
+				h.configSync(g3, 200, 203)
+			}
+
+			app, c := h.get(r12), h.get(cfg)
+			rc := stageOf(app, "reconcile")
+			if rc.State != releases.StateSucceeded || rc.Summary != "Synced eeeeeee, which includes 2222222" {
+				t.Errorf("release 12 reconcile %s %q", rc.State, rc.Summary)
+			}
+			if ro := stageOf(app, "rollout"); ro.State != releases.StateSucceeded || !ro.StartedAt.Equal(at(201)) {
+				t.Errorf("release 12 rollout %s from %v (%s)", ro.State, ro.StartedAt, ro.FailureReason)
+			}
+			if app.DeployedWith != cfg || c.DeployedWith != r12 {
+				t.Errorf("deployed with: release 12 -> %q, config -> %q", app.DeployedWith, c.DeployedWith)
+			}
+			if ro := stageOf(c, "rollout"); ro.State != releases.StateSucceeded || c.RuntimeReleaseID != r12 || c.Flag != "" {
+				t.Errorf("config rollout %s serving %q flag %q", ro.State, c.RuntimeReleaseID, c.Flag)
+			}
+			if st := stageOf(h.get(r11), "rollout"); st.State != releases.StateSucceeded || !st.CompletedAt.Equal(at(114)) {
+				t.Errorf("release 11 changed: %s at %v", st.State, st.CompletedAt)
+			}
+
+			// Only the application release is checked; the config release
+			// shares its checks.
+			cands, err := h.store.VerifyCandidates(h.ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var ids []string
+			for _, c := range cands {
+				ids = append(ids, c.ReleaseID)
+			}
+			if slices.Contains(ids, cfg) || !slices.Contains(ids, r12) {
+				t.Errorf("verify candidates %v", ids)
+			}
+			h.provider(events.ProviderVerifier, events.TypeVerifyCheck, 230, events.Keys{ReleaseID: r12}, events.VerifyCheck{
+				ReleaseID: r12, CheckedAt: at(230), Result: events.CheckPass, DNSOK: true, TLSOK: true,
+				StatusCode: 200, LatencyMS: 90, ObservedReleaseID: r12})
+			for _, id := range []string{r12, cfg} {
+				if v := stageOf(h.get(id), "verify"); v.State != releases.StateRunning || v.Summary != "1 of 5 consecutive checks passed" {
+					t.Errorf("%s verify %s %q", id, v.State, v.Summary)
+				}
+			}
+
+			if _, err := h.projector.RebuildAll(h.ctx); err != nil {
+				t.Fatal(err)
+			}
+			if a := h.get(r12); a.DeployedWith != cfg || stageOf(a, "rollout").State != releases.StateSucceeded {
+				t.Errorf("after rebuild: release 12 deployed with %q, rollout %s", a.DeployedWith, stageOf(a, "rollout").State)
+			}
+		})
+	}
+}
+
+// TestBumpCarriedByAnotherServicesCommit: the commit on top is another
+// service's deploy commit, which has a Release-Id trailer and so names no
+// config release. The bump's release still takes the sync and the rollout.
+func TestBumpCarriedByAnotherServicesCommit(t *testing.T) {
+	h := newHarness(t)
+	g2 := strings.Repeat("2", 40)
+	g3 := strings.Repeat("f", 40)
+	r12 := h.release(12, strings.Repeat("b", 40), g2, digestOf('b'), 150)
+	h.serving = r12
+	h.sync(g3, 200, 203)
+	h.rollout("bbbbbbbbbb", "12", 200, digestOf('b'))
+
+	app := h.get(r12)
+	if st := stageOf(app, "rollout"); st.State != releases.StateSucceeded || app.DeployedWith != "" {
+		t.Errorf("release 12 rollout %s, deployed with %q", st.State, app.DeployedWith)
+	}
+	if st := stageOf(app, "reconcile"); st.Summary != "Synced fffffff, which includes 2222222" {
+		t.Errorf("reconcile %q", st.Summary)
+	}
+}
+
+// TestOlderBumpIsNotAdopted: two bumps land before Argo CD syncs the newer
+// one, whose pods carry release 13. Release 12 never ran, so it keeps
+// waiting at Reconcile, even when a later config change still carries 13.
+func TestOlderBumpIsNotAdopted(t *testing.T) {
+	h := newHarness(t)
+	g2 := strings.Repeat("2", 40)
+	g3 := strings.Repeat("3", 40)
+	r12 := h.release(12, strings.Repeat("b", 40), g2, digestOf('b'), 150)
+	r13 := h.release(13, strings.Repeat("c", 40), g3, digestOf('c'), 160)
+	h.serving = r13
+	h.sync(g3, 200, 203)
+	h.rollout("cccccccccc", "13", 200, digestOf('c'))
+	h.configSync(strings.Repeat("d", 40), 400, 403)
+	h.rollout("dddddddddd", "14", 400, digestOf('c'))
+
+	if st := stageOf(h.get(r12), "reconcile"); st.State != releases.StatePending {
+		t.Errorf("release 12 reconcile %s (%q)", st.State, st.Summary)
+	}
+	if a := h.get(r13); stageOf(a, "rollout").State != releases.StateSucceeded || a.DeployedWith != "" {
+		t.Errorf("release 13 rollout %s deployed with %q", stageOf(a, "rollout").State, a.DeployedWith)
+	}
+}
+
+func TestHandEditIsFlagged(t *testing.T) {
+	h := newHarness(t)
+	g1 := strings.Repeat("1", 40)
+	g2 := strings.Repeat("2", 40)
+	r11 := h.release(11, strings.Repeat("a", 40), g1, digestOf('a'), 0)
+	r12 := h.release(12, strings.Repeat("b", 40), g2, digestOf('b'), 50)
+	h.serving = r12
+	h.sync(g2, 100, 104)
+	h.rollout("bbbbbbbbbb", "12", 100, digestOf('b'))
+
+	// An env var edit: same release and digest, not flagged.
+	env := h.configSync(strings.Repeat("c", 40), 300, 303)
+	h.rollout("cccccccccc", "13", 300, digestOf('b'))
+	if f := h.get(env).Flag; f != "" {
+		t.Errorf("env var edit flagged: %q", f)
+	}
+
+	// A hand rollback to release 11's digest and annotation.
+	h.serving = r11
+	back := h.configSync(strings.Repeat("d", 40), 500, 503)
+	h.rollout("dddddddddd", "14", 500, digestOf('a'))
+	want := "A commit without a CI release moved the pods from " + r12 + " to " + r11
+	if f := h.get(back).Flag; f != want {
+		t.Errorf("flag %q, want %q", f, want)
+	}
+	// Release 11 never synced its own commit and does not take the rollback.
+	if st := stageOf(h.get(r11), "rollout"); st.State != releases.StatePending {
+		t.Errorf("release 11 rollout %s", st.State)
 	}
 }

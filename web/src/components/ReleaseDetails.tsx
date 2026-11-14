@@ -11,6 +11,8 @@ export function ReleaseDetails({ release: r }: { release: Release }) {
     <>
       <Field k="Release" v={r.release_id} mono copy />
       <Field k="Service" v={`${r.service} · ${r.environment}`} />
+      {r.deployed_with ? <Field k="Deployed with" v={r.deployed_with} mono copy /> : null}
+      {r.flag ? <Field k="Flag" v={r.flag} /> : null}
       {r.kind === "application" ? (
         <>
           <Field

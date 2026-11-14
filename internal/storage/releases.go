@@ -14,17 +14,18 @@ const releaseColumns = `uuid, release_id, service, environment, kind, template,
 	deployed_with, drill, drill_scenario, superseded,
 	source_repository, source_sha, artifact, artifact_digest, gitops_repository, gitops_sha,
 	status, created_at, completed_at, verified_at,
-	gitops_subject, gitops_author, runtime_release_id`
+	gitops_subject, gitops_author, runtime_release_id, deployed_with_release, flag`
 
 // releaseValues returns every column of releaseColumns except uuid, in order.
 func releaseValues(r releases.Release) []any {
 	return []any{
 		r.ReleaseID, r.Service, r.Environment, string(r.Kind), r.Template,
-		nullString(r.DeployedWith), boolInt(r.Drill), nullString(r.DrillScenario), boolInt(r.Superseded),
+		nil, boolInt(r.Drill), nullString(r.DrillScenario), boolInt(r.Superseded),
 		nullString(r.SourceRepository), nullString(r.SourceSHA), nullString(r.Artifact), nullString(r.ArtifactDigest),
 		nullString(r.GitOpsRepository), nullString(r.GitOpsSHA),
 		string(r.Status), formatTime(r.CreatedAt), nullTime(r.CompletedAt), nullTime(r.VerifiedAt),
 		nullString(r.GitOpsSubject), nullString(r.GitOpsAuthor), nullString(r.RuntimeReleaseID),
+		nullString(r.DeployedWith), nullString(r.Flag),
 	}
 }
 
@@ -48,7 +49,7 @@ func (s *Store) InsertRelease(ctx context.Context, r releases.Release) (inserted
 	// Unlike INSERT OR IGNORE, a CHECK violation still fails loudly.
 	res, err := tx.ExecContext(ctx, `
 		INSERT INTO releases (`+releaseColumns+`)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (release_id) DO NOTHING`,
 		append([]any{r.UUID}, releaseValues(r)...)...,
 	)
@@ -225,14 +226,14 @@ func scanRelease(sc rowScanner) (releases.Release, error) {
 	var kind, status, createdAt string
 	var drill, superseded int
 	var deployedWith, drillScenario, sourceRepo, sourceSHA, artifact, digest, gitopsRepo, gitopsSHA, completedAt, verifiedAt sql.NullString
-	var subject, author, runtimeID sql.NullString
+	var subject, author, runtimeID, deployedWithRelease, flag sql.NullString
 
 	if err := sc.Scan(
 		&r.UUID, &r.ReleaseID, &r.Service, &r.Environment, &kind, &r.Template,
 		&deployedWith, &drill, &drillScenario, &superseded,
 		&sourceRepo, &sourceSHA, &artifact, &digest, &gitopsRepo, &gitopsSHA,
 		&status, &createdAt, &completedAt, &verifiedAt,
-		&subject, &author, &runtimeID,
+		&subject, &author, &runtimeID, &deployedWithRelease, &flag,
 	); err != nil {
 		return r, err
 	}
@@ -241,7 +242,10 @@ func scanRelease(sc rowScanner) (releases.Release, error) {
 	r.Status = releases.State(status)
 	r.Drill = drill == 1
 	r.Superseded = superseded == 1
-	r.DeployedWith = deployedWith.String
+	// deployed_with (a UUID) is no longer written; see migration 0005.
+	_ = deployedWith
+	r.DeployedWith = deployedWithRelease.String
+	r.Flag = flag.String
 	r.DrillScenario = drillScenario.String
 	r.SourceRepository = sourceRepo.String
 	r.SourceSHA = sourceSHA.String

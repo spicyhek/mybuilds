@@ -104,3 +104,76 @@ func (s *Store) ReleasesWithRevision(ctx context.Context, revision string) ([]st
 	}
 	return out, rows.Err()
 }
+
+// AppSyncEvents returns an Argo CD Application's notifications for one
+// revision, oldest first. A release adopts them when its own commit was
+// applied as part of that newer one.
+func (s *Store) AppSyncEvents(ctx context.Context, application, revision string) ([]events.Event, error) {
+	return s.queryEvents(ctx, `
+		SELECT `+eventColumns+` FROM events
+		WHERE provider = ? AND revision = ? AND json_extract(payload, '$.application') = ?
+		ORDER BY occurred_at, id`, events.ProviderArgoCD, revision, application)
+}
+
+// VerifierEvents returns the verifier's events for a release, oldest first.
+func (s *Store) VerifierEvents(ctx context.Context, releaseID string) ([]events.Event, error) {
+	return s.queryEvents(ctx, `
+		SELECT `+eventColumns+` FROM events WHERE release_key = ? AND provider = ?
+		ORDER BY occurred_at, id`, releaseID, events.ProviderVerifier)
+}
+
+// LastDeploymentBefore returns a workload's latest Deployment snapshot that
+// occurred before t, or nil.
+func (s *Store) LastDeploymentBefore(ctx context.Context, workload string, t time.Time) (*events.Event, error) {
+	evs, err := s.queryEvents(ctx, `
+		SELECT `+eventColumns+` FROM events
+		WHERE workload = ? AND type = ? AND occurred_at < ?
+		ORDER BY occurred_at DESC, id DESC LIMIT 1`, workload, events.TypeDeployment, formatTime(t))
+	if err != nil || len(evs) == 0 {
+		return nil, err
+	}
+	return &evs[0], nil
+}
+
+// UnsyncedReleases returns a service's application releases created since
+// t whose reported GitOps commit has no Argo CD sync. It stays true after a
+// newer commit that carried the bump is adopted, so runtime events keep
+// reaching the release.
+func (s *Store) UnsyncedReleases(ctx context.Context, service string, since time.Time) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT r.release_id FROM releases r
+		WHERE r.service = ? AND r.kind = 'application' AND r.created_at >= ?
+			AND r.gitops_sha IS NOT NULL AND r.superseded = 0
+			AND NOT EXISTS (SELECT 1 FROM events e WHERE e.provider = ? AND e.revision = r.gitops_sha)
+		ORDER BY r.created_at`, service, formatTime(since), events.ProviderArgoCD)
+	if err != nil {
+		return nil, fmt.Errorf("unsynced releases of %s: %w", service, err)
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) queryEvents(ctx context.Context, q string, args ...any) ([]events.Event, error) {
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query events: %w", err)
+	}
+	defer rows.Close()
+	var out []events.Event
+	for rows.Next() {
+		e, err := scanEvent(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
