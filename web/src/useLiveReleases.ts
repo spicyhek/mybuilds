@@ -100,7 +100,7 @@ export function useLiveReleases(): LiveReleases {
 
 // sameShape is true when the stage states and timestamps match, so a detailed
 // copy is still current.
-function sameShape(a: Release, b: Release): boolean {
+export function sameShape(a: Release, b: Release): boolean {
   if (a.status !== b.status || a.stages.length !== b.stages.length) return false;
   return a.stages.every((s, i) => {
     const o = b.stages[i];

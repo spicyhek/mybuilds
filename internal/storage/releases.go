@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spicyhek/mybuilds/internal/releases"
@@ -91,36 +92,105 @@ func insertStages(ctx context.Context, tx *sql.Tx, uuid string, r releases.Relea
 	return nil
 }
 
+// ReleaseCursor is the position of a release in the newest-first order:
+// created_at descending, then release_id ascending.
+type ReleaseCursor struct {
+	CreatedAt time.Time
+	ReleaseID string
+}
+
+// ReleaseFilter selects a page of releases for ListReleasesPage. Zero
+// fields do not filter.
+type ReleaseFilter struct {
+	Limit   int
+	Service string
+	// Kind is "application" or "config".
+	Kind string
+	// Outcome is a release state, or "skipped", which also matches
+	// superseded releases (the UI shows those as skipped).
+	Outcome string
+	// Drill keeps only drills (true) or leaves them out (false).
+	Drill *bool
+	// After continues from the last release of the previous page.
+	After *ReleaseCursor
+}
+
 // ListReleases returns the newest releases first, with their stages.
 func (s *Store) ListReleases(ctx context.Context, limit int) ([]releases.Release, error) {
+	list, _, err := s.ListReleasesPage(ctx, ReleaseFilter{Limit: limit})
+	return list, err
+}
+
+// ListReleasesPage returns one page of releases, newest first, with their
+// stages. next is set when more releases match after this page.
+func (s *Store) ListReleasesPage(ctx context.Context, f ReleaseFilter) (list []releases.Release, next *ReleaseCursor, err error) {
+	if f.Limit < 1 {
+		return nil, nil, errors.New("limit must be positive")
+	}
+	where := []string{"1 = 1"}
+	var args []any
+	if f.Service != "" {
+		where = append(where, "service = ?")
+		args = append(args, f.Service)
+	}
+	if f.Kind != "" {
+		where = append(where, "kind = ?")
+		args = append(args, f.Kind)
+	}
+	switch f.Outcome {
+	case "":
+	case string(releases.StateSkipped):
+		where = append(where, "(superseded = 1 OR status = ?)")
+		args = append(args, f.Outcome)
+	default:
+		where = append(where, "superseded = 0 AND status = ?")
+		args = append(args, f.Outcome)
+	}
+	if f.Drill != nil {
+		where = append(where, "drill = ?")
+		args = append(args, boolInt(*f.Drill))
+	}
+	if f.After != nil {
+		at := formatTime(f.After.CreatedAt)
+		where = append(where, "(created_at < ? OR (created_at = ? AND release_id > ?))")
+		args = append(args, at, at, f.After.ReleaseID)
+	}
+	// One extra row says whether another page follows.
+	args = append(args, f.Limit+1)
+
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+releaseColumns+` FROM releases
+		WHERE `+strings.Join(where, " AND ")+`
 		ORDER BY created_at DESC, release_id
-		LIMIT ?`, limit)
+		LIMIT ?`, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list releases: %w", err)
+		return nil, nil, fmt.Errorf("list releases: %w", err)
 	}
 	defer rows.Close()
 
-	var out []releases.Release
 	for rows.Next() {
 		r, err := scanRelease(rows)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		out = append(out, r)
+		list = append(list, r)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("list releases: %w", err)
+		return nil, nil, fmt.Errorf("list releases: %w", err)
 	}
 	rows.Close()
 
-	for i := range out {
-		if out[i].Stages, err = s.loadStages(ctx, out[i].UUID); err != nil {
-			return nil, err
+	if len(list) > f.Limit {
+		list = list[:f.Limit]
+		last := list[len(list)-1]
+		next = &ReleaseCursor{CreatedAt: last.CreatedAt, ReleaseID: last.ReleaseID}
+	}
+	for i := range list {
+		if list[i].Stages, err = s.loadStages(ctx, list[i].UUID); err != nil {
+			return nil, nil, err
 		}
 	}
-	return out, nil
+	return list, next, nil
 }
 
 // GetRelease returns one release by its external release ID, with its stages

@@ -1,22 +1,22 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { fetchMeta, type Meta, type Release } from "./api";
-import { OUTCOME_LABEL, relTime, shortSha, statusLine } from "./format";
-import { GitHubIcon, MoonIcon, StateIcon, SunIcon } from "./components/Icons";
-import { Pipeline } from "./components/Pipeline";
+import { GitHubIcon, MoonIcon, SunIcon } from "./components/Icons";
+import { Player } from "./components/Player";
 import { ReleaseDetails } from "./components/ReleaseDetails";
-import { ReleaseRow } from "./components/ReleaseRow";
-import { StagePanel } from "./components/StagePanel";
+import { ReleaseTable } from "./components/ReleaseTable";
+import { History } from "./pages/History";
+import { ReleasePage } from "./pages/ReleasePage";
+import { onLinkClick, releasePath, useRoute } from "./route";
 import { useLiveReleases } from "./useLiveReleases";
 
 type Theme = "light" | "dark" | null;
 
 export default function App() {
-  const { releases, connection, error, lastTouched, loadDetail } = useLiveReleases();
+  const route = useRoute();
+  const live = useLiveReleases();
+  const { releases, connection, error } = live;
   const [meta, setMeta] = useState<Meta | null>(null);
-  const [picked, setPicked] = useState<string | null>(null);
-  const [pinnedStage, setPinnedStage] = useState<string | null>(null);
-  const [showDrills, setShowDrills] = useState(true);
-  const [service, setService] = useState("");
+  const [routed, setRouted] = useState<Release | null>(null);
   const [theme, setTheme] = useState<Theme>(() => {
     try {
       const t = localStorage.getItem("mybuilds-theme");
@@ -44,53 +44,82 @@ export default function App() {
     }
   }, [theme]);
 
-  const visible = useMemo(
-    () => releases.filter((r) => (showDrills || !r.drill) && (!service || r.service === service)),
-    [releases, showDrills, service],
-  );
-
-  // The player follows the most recently touched release until the user
-  // picks one; a running release wins over an idle one.
-  const playing: Release | undefined = useMemo(() => {
-    if (picked) {
-      const p = visible.find((r) => r.release_id === picked);
-      if (p) return p;
-    }
-    const touched = lastTouched ? visible.find((r) => r.release_id === lastTouched) : undefined;
-    if (touched) return touched;
-    return visible.find((r) => r.status === "running") ?? visible[0];
-  }, [picked, lastTouched, visible]);
-
-  // Steps come with the single-release endpoint; load them once per release.
   useEffect(() => {
-    if (playing && !playing.stages.some((s) => s.steps)) void loadDetail(playing.release_id);
-  }, [playing, loadDetail]);
+    if (route.name === "history") document.title = "History · mybuilds";
+    else if (route.name !== "release") document.title = "mybuilds";
+  }, [route]);
 
-  const now = useNow(releases.some((r) => r.status === "running"));
+  const now = useNow(releases.some((r) => r.status === "running") || routed?.status === "running");
+  const services = useMemo(
+    () => Array.from(new Set([...releases.map((r) => r.service), ...(meta?.services.map((s) => s.name) ?? [])])).sort(),
+    [releases, meta],
+  );
+  const onRouted = useCallback((r: Release | null) => setRouted(r), []);
 
-  const focusKey = useMemo(() => {
-    if (!playing) return null;
-    if (pinnedStage && playing.stages.some((s) => s.key === pinnedStage)) return pinnedStage;
-    const active = playing.stages.find((s) => s.state === "running") ?? playing.stages.find((s) => s.state === "failed");
-    if (active) return active.key;
-    const last = [...playing.stages].reverse().find((s) => s.state !== "pending");
-    return (last ?? playing.stages[0])?.key ?? null;
-  }, [playing, pinnedStage]);
-  const focusStage = playing?.stages.find((s) => s.key === focusKey);
-  const svc = meta?.services.find((s) => s.name === playing?.service);
-  const services = useMemo(() => Array.from(new Set(releases.map((r) => r.service))).sort(), [releases]);
+  let content: ReactNode;
+  let detail: Release | undefined;
+  let crumb = "Pipelines";
+  switch (route.name) {
+    case "pipelines":
+      content = <Pipelines live={live} meta={meta} services={services} now={now} onPlaying={onRouted} />;
+      detail = routed ?? undefined;
+      break;
+    case "history":
+      crumb = "History";
+      content = <History query={route.query} live={releases} services={services} now={now} />;
+      break;
+    case "release":
+      crumb = route.id;
+      content = <ReleasePage id={route.id} live={releases} services={meta?.services ?? []} now={now} onLoaded={onRouted} />;
+      detail = routed ?? undefined;
+      break;
+    default:
+      crumb = "Not found";
+      content = (
+        <section className="card">
+          <div className="empty">
+            Nothing here.{" "}
+            <a href="/" onClick={onLinkClick}>
+              Back to the pipelines
+            </a>
+          </div>
+        </section>
+      );
+  }
 
   return (
     <>
       <header className="topbar">
         <div className="crumbs">
-          <span className="brand">mybuilds</span>
+          <a className="brand" href="/" onClick={onLinkClick}>
+            mybuilds
+          </a>
           <span className="crumb-sep" aria-hidden="true">
             ›
           </span>
-          <span className="crumb-cur">Pipelines</span>
+          {route.name === "release" && (
+            <>
+              <a className="crumb-link" href="/history" onClick={onLinkClick}>
+                History
+              </a>
+              <span className="crumb-sep" aria-hidden="true">
+                ›
+              </span>
+            </>
+          )}
+          <span className="crumb-cur" title={crumb}>
+            {crumb}
+          </span>
         </div>
         <div className="top-actions">
+          <nav className="nav" aria-label="Screens">
+            <a href="/" onClick={onLinkClick} aria-current={route.name === "pipelines" ? "page" : undefined}>
+              Pipelines
+            </a>
+            <a href="/history" onClick={onLinkClick} aria-current={route.name === "history" ? "page" : undefined}>
+              History
+            </a>
+          </nav>
           {meta?.fixtures && (
             <span className="fixture" title="Fixture mode: sample releases and a replayed event stream">
               Fixture data
@@ -119,98 +148,14 @@ export default function App() {
           </div>
         )}
         <section className="layout">
-          <div className="col">
-            <section className="card" aria-label="Release player">
-              <div className="card-head">
-                <span>{playing?.status === "running" ? "Now playing" : "Latest release"}</span>
-                {playing?.status === "running" && <span className="badge badge-live">LIVE</span>}
-                <span className="spacer" />
-                {playing && <OutcomePill release={playing} />}
-              </div>
-              <div className="card-body">
-                {playing ? (
-                  <>
-                    <div className="pl-top">
-                      <div style={{ minWidth: 0 }}>
-                        <div className="pl-title">
-                          {playing.service}
-                          {playing.drill && <span className="tag tag-drill">DRILL</span>}
-                          {playing.kind === "config" && <span className="tag tag-config">CONFIG</span>}
-                          <span className="mono" style={{ fontWeight: 400 }}>
-                            {shortSha(playing.kind === "config" ? playing.gitops_sha : playing.source_sha)}
-                          </span>
-                        </div>
-                        <div className="pl-sub">
-                          {playing.release_id} · started {relTime(playing.created_at, now)}
-                          {picked && (
-                            <>
-                              {" · "}
-                              <button type="button" className="linkish" onClick={() => setPicked(null)}>
-                                follow latest
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="canvas">
-                      <Pipeline
-                        release={playing}
-                        now={now}
-                        focus={focusKey}
-                        pinned={pinnedStage !== null}
-                        onPick={(key) => setPinnedStage(pinnedStage === key ? null : key)}
-                      />
-                    </div>
-                    <StatusLine release={playing} />
-                    {focusStage && <StagePanel release={playing} stage={focusStage} service={svc} now={now} pinned={pinnedStage !== null} />}
-                  </>
-                ) : (
-                  <div className="empty">{releases.length === 0 && !error ? "Waiting for the first release…" : "No releases match the filter."}</div>
-                )}
-              </div>
-            </section>
-
-            <section className="card" aria-label="Recent releases">
-              <div className="card-head">
-                <span>Recent releases</span>
-                <span className="spacer" />
-                <div className="filters">
-                  <select aria-label="Filter by service" value={service} onChange={(e) => setService(e.target.value)}>
-                    <option value="">All services</option>
-                    {services.map((s) => (
-                      <option key={s}>{s}</option>
-                    ))}
-                  </select>
-                  <label>
-                    <input type="checkbox" checked={showDrills} onChange={(e) => setShowDrills(e.target.checked)} /> Drills
-                  </label>
-                </div>
-              </div>
-              <div role="table" aria-label="Recent releases">
-                <div className="tr th" role="row">
-                  <span role="columnheader">Release</span>
-                  <span role="columnheader">Pipeline</span>
-                  <span role="columnheader">Outcome</span>
-                  <span role="columnheader">Started</span>
-                  <span role="columnheader">Duration</span>
-                </div>
-                {visible.length === 0 ? (
-                  <div className="empty">No releases yet.</div>
-                ) : (
-                  visible.map((r) => (
-                    <ReleaseRow key={r.release_id} release={r} now={now} selected={playing?.release_id === r.release_id} onSelect={(id) => setPicked(id === picked ? null : id)} />
-                  ))
-                )}
-              </div>
-            </section>
-          </div>
-
+          <div className="col">{content}</div>
           <aside className="col sidebar">
-            <section className="side" aria-label="Release details">
-              <h2>Release details</h2>
-              {playing ? <ReleaseDetails release={playing} /> : <p className="await">Select a release.</p>}
-            </section>
+            {detail && (
+              <section className="side" aria-label="Release details">
+                <h2>Release details</h2>
+                <ReleaseDetails release={detail} />
+              </section>
+            )}
             <section className="side" aria-label="About">
               <h2>About</h2>
               <p className="about">
@@ -229,6 +174,110 @@ export default function App() {
   );
 }
 
+interface PipelinesProps {
+  live: ReturnType<typeof useLiveReleases>;
+  meta: Meta | null;
+  services: string[];
+  now: number;
+  onPlaying: (r: Release | null) => void;
+}
+
+/** The homepage: the player over the most recent releases. */
+function Pipelines({ live, meta, services, now, onPlaying }: PipelinesProps) {
+  const { releases, error, lastTouched, loadDetail } = live;
+  const [picked, setPicked] = useState<string | null>(null);
+  const [showDrills, setShowDrills] = useState(true);
+  const [service, setService] = useState("");
+
+  const visible = useMemo(
+    () => releases.filter((r) => (showDrills || !r.drill) && (!service || r.service === service)),
+    [releases, showDrills, service],
+  );
+
+  // The player follows the most recently touched release until the user
+  // picks one; a running release wins over an idle one.
+  const playing: Release | undefined = useMemo(() => {
+    if (picked) {
+      const p = visible.find((r) => r.release_id === picked);
+      if (p) return p;
+    }
+    const touched = lastTouched ? visible.find((r) => r.release_id === lastTouched) : undefined;
+    if (touched) return touched;
+    return visible.find((r) => r.status === "running") ?? visible[0];
+  }, [picked, lastTouched, visible]);
+
+  useEffect(() => {
+    onPlaying(playing ?? null);
+  }, [playing, onPlaying]);
+
+  // Steps come with the single-release endpoint; load them once per release.
+  useEffect(() => {
+    if (playing && !playing.stages.some((s) => s.steps)) void loadDetail(playing.release_id);
+  }, [playing, loadDetail]);
+
+  return (
+    <>
+      {playing ? (
+        <Player
+          release={playing}
+          service={meta?.services.find((s) => s.name === playing.service)}
+          now={now}
+          heading={playing.status === "running" ? "Now playing" : "Latest release"}
+          sub={
+            <>
+              {" · "}
+              <a href={releasePath(playing.release_id)} onClick={onLinkClick}>
+                link
+              </a>
+              {picked && (
+                <>
+                  {" · "}
+                  <button type="button" className="linkish" onClick={() => setPicked(null)}>
+                    follow latest
+                  </button>
+                </>
+              )}
+            </>
+          }
+        />
+      ) : (
+        <section className="card" aria-label="Release player">
+          <div className="empty">{releases.length === 0 && !error ? "Waiting for the first release…" : "No releases match the filter."}</div>
+        </section>
+      )}
+
+      <section className="card" aria-label="Recent releases">
+        <div className="card-head">
+          <span>Recent releases</span>
+          <a className="head-link" href="/history" onClick={onLinkClick}>
+            All releases
+          </a>
+          <span className="spacer" />
+          <div className="filters">
+            <select aria-label="Filter by service" value={service} onChange={(e) => setService(e.target.value)}>
+              <option value="">All services</option>
+              {services.map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </select>
+            <label>
+              <input type="checkbox" checked={showDrills} onChange={(e) => setShowDrills(e.target.checked)} /> Drills
+            </label>
+          </div>
+        </div>
+        <ReleaseTable
+          label="Recent releases"
+          releases={visible}
+          now={now}
+          selected={playing?.release_id}
+          empty="No releases yet."
+          onSelect={(id) => setPicked(id === picked ? null : id)}
+        />
+      </section>
+    </>
+  );
+}
+
 function ConnectionBadge({ connection }: { connection: "connecting" | "live" | "reconnecting" }) {
   const label = connection === "live" ? "Live" : connection === "connecting" ? "Connecting" : "Reconnecting";
   const title = connection === "live" ? "Event stream connected" : "Event stream not connected; the browser retries automatically";
@@ -237,28 +286,6 @@ function ConnectionBadge({ connection }: { connection: "connecting" | "live" | "
       <span className="conn-dot" aria-hidden="true" />
       {label}
     </span>
-  );
-}
-
-function OutcomePill({ release: r }: { release: Release }) {
-  const outcome = r.superseded ? "skipped" : r.status;
-  return (
-    <span className={`pill o-${outcome}`}>
-      <StateIcon state={outcome} />
-      {OUTCOME_LABEL[outcome]}
-    </span>
-  );
-}
-
-function StatusLine({ release }: { release: Release }) {
-  const { text, state } = statusLine(release);
-  return (
-    <div className="pl-status" aria-live="polite">
-      <span className={`sp-title s-${state}`}>
-        <StateIcon state={state} />
-      </span>
-      <span className="msg">{text}</span>
-    </div>
   );
 }
 
