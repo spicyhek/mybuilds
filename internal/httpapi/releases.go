@@ -1,9 +1,12 @@
 package httpapi
 
 import (
+	"encoding/base64"
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spicyhek/mybuilds/internal/releases"
@@ -69,8 +72,7 @@ type stepView struct {
 
 type listReleasesResponse struct {
 	Releases []releaseView `json:"releases"`
-	// NextCursor is always null until cursor pagination lands with the
-	// history screen (plan section 7.2).
+	// NextCursor continues the list; null on the last page.
 	NextCursor *string `json:"next_cursor"`
 }
 
@@ -130,17 +132,13 @@ func toView(r releases.Release) releaseView {
 }
 
 func (s *server) listReleases(w http.ResponseWriter, r *http.Request) {
-	limit := defaultListLimit
-	if v := r.URL.Query().Get("limit"); v != "" {
-		n, err := strconv.Atoi(v)
-		if err != nil || n < 1 || n > maxListLimit {
-			writeError(w, http.StatusBadRequest, "limit must be an integer between 1 and 200")
-			return
-		}
-		limit = n
+	f, msg := parseListQuery(r.URL.Query())
+	if msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
+		return
 	}
 
-	list, err := s.store.ListReleases(r.Context(), limit)
+	list, next, err := s.store.ListReleasesPage(r.Context(), f)
 	if err != nil {
 		s.logger.Error("list releases", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
@@ -151,7 +149,84 @@ func (s *server) listReleases(w http.ResponseWriter, r *http.Request) {
 	for _, rel := range list {
 		views = append(views, toView(rel))
 	}
-	writeJSON(w, http.StatusOK, listReleasesResponse{Releases: views})
+	resp := listReleasesResponse{Releases: views}
+	if next != nil {
+		c := encodeCursor(*next)
+		resp.NextCursor = &c
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+var outcomes = map[string]bool{
+	string(releases.StatePending):   true,
+	string(releases.StateRunning):   true,
+	string(releases.StateSucceeded): true,
+	string(releases.StateFailed):    true,
+	string(releases.StateDegraded):  true,
+	string(releases.StateSkipped):   true,
+	string(releases.StateUnknown):   true,
+}
+
+// parseListQuery reads the filters of GET /api/v1/releases. A non-empty
+// message means the query is invalid.
+func parseListQuery(q url.Values) (storage.ReleaseFilter, string) {
+	f := storage.ReleaseFilter{Limit: defaultListLimit, Service: q.Get("service")}
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > maxListLimit {
+			return f, "limit must be an integer between 1 and 200"
+		}
+		f.Limit = n
+	}
+	switch k := q.Get("kind"); k {
+	case "", string(releases.KindApplication), string(releases.KindConfig):
+		f.Kind = k
+	default:
+		return f, "kind must be application or config"
+	}
+	if o := q.Get("outcome"); o != "" {
+		if !outcomes[o] {
+			return f, "outcome must be a release state"
+		}
+		f.Outcome = o
+	}
+	if v := q.Get("drill"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return f, "drill must be true or false"
+		}
+		f.Drill = &b
+	}
+	if v := q.Get("cursor"); v != "" {
+		c, err := decodeCursor(v)
+		if err != nil {
+			return f, "invalid cursor"
+		}
+		f.After = &c
+	}
+	return f, ""
+}
+
+// A cursor is opaque to clients: the last release's creation time and ID,
+// base64url-encoded.
+func encodeCursor(c storage.ReleaseCursor) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(c.CreatedAt.UTC().Format(time.RFC3339Nano) + "\n" + c.ReleaseID))
+}
+
+func decodeCursor(v string) (storage.ReleaseCursor, error) {
+	b, err := base64.RawURLEncoding.DecodeString(v)
+	if err != nil {
+		return storage.ReleaseCursor{}, err
+	}
+	at, id, ok := strings.Cut(string(b), "\n")
+	if !ok || id == "" {
+		return storage.ReleaseCursor{}, errors.New("malformed cursor")
+	}
+	t, err := time.Parse(time.RFC3339Nano, at)
+	if err != nil {
+		return storage.ReleaseCursor{}, err
+	}
+	return storage.ReleaseCursor{CreatedAt: t, ReleaseID: id}, nil
 }
 
 func (s *server) getRelease(w http.ResponseWriter, r *http.Request) {

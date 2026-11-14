@@ -6,13 +6,15 @@ verified public response, with each stage backed by its own evidence. A green
 CI run, an Argo CD sync, a Ready pod and a passing public check are four
 separate facts; mybuilds never treats one as proof of another.
 
-**Status: M2, config releases.** The server receives signed GitHub, CI and Argo
+**Status: M3, release history.** The server receives signed GitHub, CI and Argo
 CD events, watches its workloads through read-only Kubernetes informers,
 checks each release's public URL, stores every delivery, observation and
 check once, projects releases from Source through Verify, streams changes
 over SSE and serves the React pipeline view. It runs on the cluster it
 watches. Human edits in homelab-infra become config releases with their own
-rollout and verification. `demo/index.html` is the standalone UI prototype the view was built
+rollout and verification. Every release has a shareable URL,
+`/releases/{release_id}`, and the history screen at `/history` filters them
+all. `demo/index.html` is the standalone UI prototype the view was built
 from.
 
 ## Layout
@@ -131,7 +133,7 @@ serves production, screenshots and the CI smoke test.
 | --- | --- |
 | `GET /healthz` | Liveness. Returns `X-Release-ID` and `Cache-Control: no-store` |
 | `GET /readyz` | Readiness. 503 when the database does not answer |
-| `GET /api/v1/releases?limit=N` | Newest releases first, with stages. `next_cursor` is null until cursor pagination lands |
+| `GET /api/v1/releases` | Newest releases first, with stages. Query: `limit` (1–200, default 50), `service`, `kind` (`application`, `config`), `outcome` (a release state; `skipped` includes superseded releases), `drill` (`true` keeps only drills, `false` hides them) and `cursor`. `next_cursor` continues the list and is null on the last page |
 | `GET /api/v1/releases/{release_id}` | One release with each stage's steps. IDs contain slashes, e.g. `personal-site/ce61154/production/11` |
 | `GET /api/v1/stream` | Server-Sent Events: `hello`, then `release.created` and `release.updated` with the full release view. The SSE `id` is the event ID; a reconnect with `Last-Event-ID` replays what was missed, or sends `snapshot` when the cursor is too old |
 | `GET /api/v1/meta` | Version, release ID, fixture mode and the public parts of the service map |

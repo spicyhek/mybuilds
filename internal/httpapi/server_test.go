@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -138,6 +139,59 @@ func TestListReleasesRejectsBadLimit(t *testing.T) {
 	}
 	if rec := get(t, h, "/api/v1/releases?limit=1"); rec.Code != http.StatusOK {
 		t.Errorf("limit=1: status = %d", rec.Code)
+	}
+}
+
+func TestListReleasesRejectsBadFilters(t *testing.T) {
+	h, _ := newTestServer(t)
+	for _, q := range []string{"kind=other", "outcome=green", "drill=maybe", "cursor=!!", "cursor=bm90LWEtY3Vyc29y"} {
+		if rec := get(t, h, "/api/v1/releases?"+q); rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400", q, rec.Code)
+		}
+	}
+}
+
+func TestListReleasesPaginatesAndFilters(t *testing.T) {
+	h, _ := newTestServer(t)
+	type page struct {
+		Releases []struct {
+			ReleaseID string `json:"release_id"`
+		} `json:"releases"`
+		NextCursor *string `json:"next_cursor"`
+	}
+	list := func(q string) page {
+		t.Helper()
+		rec := get(t, h, "/api/v1/releases?"+q)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: status = %d, body %s", q, rec.Code, rec.Body.String())
+		}
+		var p page
+		if err := json.Unmarshal(rec.Body.Bytes(), &p); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+
+	first := list("limit=1")
+	if len(first.Releases) != 1 || first.NextCursor == nil {
+		t.Fatalf("first page = %+v, want one release and a cursor", first)
+	}
+	second := list("limit=1&cursor=" + url.QueryEscape(*first.NextCursor))
+	if len(second.Releases) != 1 || second.Releases[0].ReleaseID == first.Releases[0].ReleaseID {
+		t.Fatalf("second page = %+v after %+v", second, first)
+	}
+
+	drills := list("drill=true")
+	for _, r := range drills.Releases {
+		if !strings.HasPrefix(r.ReleaseID, "drill-target/") {
+			t.Errorf("drill=true returned %s", r.ReleaseID)
+		}
+	}
+	if len(drills.Releases) == 0 {
+		t.Error("drill=true returned nothing")
+	}
+	if cfg := list("kind=config&drill=false"); len(cfg.Releases) != 1 || cfg.Releases[0].ReleaseID != "personal-site/config/5bb4095/production" {
+		t.Errorf("kind=config = %+v", cfg)
 	}
 }
 

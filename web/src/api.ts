@@ -87,10 +87,19 @@ export interface Meta {
   services: Service[];
 }
 
+export class HTTPError extends Error {
+  constructor(
+    path: string,
+    readonly status: number,
+  ) {
+    super(`${path}: HTTP ${status}`);
+  }
+}
+
 async function getJSON<T>(path: string): Promise<T> {
   const res = await fetch(path, { headers: { Accept: "application/json" } });
   if (!res.ok) {
-    throw new Error(`${path}: HTTP ${res.status}`);
+    throw new HTTPError(path, res.status);
   }
   return (await res.json()) as T;
 }
@@ -98,6 +107,27 @@ async function getJSON<T>(path: string): Promise<T> {
 export const fetchReleases = (limit = 50) =>
   getJSON<{ releases: Release[] }>(`/api/v1/releases?limit=${limit}`).then((r) => r.releases);
 
-export const fetchRelease = (id: string) => getJSON<Release>(`/api/v1/releases/${id}`);
+export interface ReleaseQuery {
+  service?: string;
+  kind?: string;
+  outcome?: string;
+  /** "true" keeps only drills, "false" hides them. */
+  drill?: string;
+}
+
+export interface ReleasePage {
+  releases: Release[];
+  next_cursor: string | null;
+}
+
+export function fetchReleasePage(q: ReleaseQuery, cursor?: string, limit = 50): Promise<ReleasePage> {
+  const p = new URLSearchParams({ limit: String(limit) });
+  for (const [k, v] of Object.entries(q)) if (v) p.set(k, v);
+  if (cursor) p.set("cursor", cursor);
+  return getJSON<ReleasePage>(`/api/v1/releases?${p}`);
+}
+
+export const fetchRelease = (id: string) =>
+  getJSON<Release>(`/api/v1/releases/${id.split("/").map(encodeURIComponent).join("/")}`);
 
 export const fetchMeta = () => getJSON<Meta>("/api/v1/meta");
