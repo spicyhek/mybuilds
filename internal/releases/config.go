@@ -72,3 +72,21 @@ func syncStart(a argoObs) time.Time {
 	}
 	return a.at
 }
+
+// handEditFlag explains why a config release bypassed CI: its new pods carry
+// another release ID or digest than the pod template did before the sync,
+// so a hand edit changed what runs (plan section 8.7). A config release
+// deployed together with an application release is not flagged: the change
+// came from CI's own bump.
+func handEditFlag(r Release, rt *Runtime) string {
+	if r.Kind != KindConfig || rt == nil || rt.Partner != "" {
+		return ""
+	}
+	switch {
+	case r.RuntimeReleaseID != "" && rt.PrevReleaseID != "" && r.RuntimeReleaseID != rt.PrevReleaseID:
+		return fmt.Sprintf("A commit without a CI release moved the pods from %s to %s", rt.PrevReleaseID, r.RuntimeReleaseID)
+	case r.ArtifactDigest != "" && rt.PrevDigest != "" && r.ArtifactDigest != rt.PrevDigest:
+		return fmt.Sprintf("A commit without a CI release moved the pods from %s to %s", short(rt.PrevDigest, 19), short(r.ArtifactDigest, 19))
+	}
+	return ""
+}

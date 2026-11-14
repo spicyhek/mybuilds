@@ -51,6 +51,8 @@ export interface Release {
   gitops_subject?: string;
   gitops_author?: string;
   runtime_release_id?: string;
+  deployed_with?: string;
+  flag?: string;
   status: State;
   created_at: string;
   completed_at?: string;

@@ -25,6 +25,15 @@ type Runtime struct {
 	// End is the start of the next sync, or nil while this is the latest.
 	End    *time.Time
 	Events []events.Event
+	// Revision is the synced commit whose window this is. It differs from
+	// the release's GitOps commit when a newer commit carried it (rule 2).
+	Revision string
+	// Partner is the release deployed together with this one, if any.
+	Partner string
+	// PrevReleaseID and PrevDigest are what the pod template carried
+	// before the window, from the last Deployment snapshot.
+	PrevReleaseID string
+	PrevDigest    string
 }
 
 // RuntimeWindow returns the runtime window of revision among an

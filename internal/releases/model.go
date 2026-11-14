@@ -51,9 +51,12 @@ type Release struct {
 	Kind        Kind   `json:"kind"`
 	Template    string `json:"template"`
 
-	// DeployedWith is the UUID of a release that shares this release's
-	// Rollout and Verify evidence (plan section 8.7).
-	DeployedWith  string `json:"deployed_with,omitempty"`
+	// DeployedWith is the release ID of a release that shares this
+	// release's Rollout and Verify evidence (plan section 8.7, rule 2).
+	DeployedWith string `json:"deployed_with,omitempty"`
+	// Flag explains why a config release bypassed CI, such as a hand edit
+	// that moved the pods to another release or digest.
+	Flag          string `json:"flag,omitempty"`
 	Drill         bool   `json:"drill"`
 	DrillScenario string `json:"drill_scenario,omitempty"`
 	// Superseded marks a release whose promotion was skipped because a newer

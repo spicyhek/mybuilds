@@ -32,6 +32,11 @@ export function ReleaseRow({ release: r, now, selected, onSelect }: Props) {
           {r.service}
           {r.drill && <span className="tag tag-drill">DRILL</span>}
           {r.kind === "config" && <span className="tag tag-config">CONFIG</span>}
+          {r.flag && (
+            <span className="tag tag-flag" title={r.flag}>
+              HAND EDIT
+            </span>
+          )}
           {r.status === "running" && <span className="tag tag-live">LIVE</span>}
           <span className="mono" style={{ fontWeight: 400 }}>
             {shortSha(sha)}

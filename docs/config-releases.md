@@ -58,17 +58,53 @@ pending until the next sync, which ends it `unknown`.
 If the new pods carry no `mybuilds.brendanmanley.com/release-id` annotation,
 there is no `X-Release-ID` to expect, and Verify is skipped.
 
+## Deployed together
+
+Sometimes Argo CD never syncs a digest bump's own commit: a human commit, or
+another service's deploy commit, lands on top of it first, and Argo CD
+applies the newer commit with the bump inside it (plan section 8.7, rule 2).
+
+An application release whose GitOps commit was never synced adopts a later
+sync when both hold:
+
+- the sync started after the release's `gitops.updated`, allowing 30 seconds
+  for Argo CD starting just before the event arrives;
+- it is the first sync after that point to start new pods, and those pods
+  carry the release's `release-id` annotation.
+
+The release then takes that sync for Reconcile ("Synced `eeeeeee`, which
+includes `2222222`") and that window for Rollout and Verify. A later rollout
+that still carries the same annotation, such as a config change made after
+it, never adopts the release.
+
+If the newer commit is a human commit, its config release and the
+application release are **deployed together**: each names the other in
+`deployed_with`. They share the rollout, and the verifier checks only the
+application release; the config release shows the same checks. If the newer
+commit is another service's deploy commit, there is no config release and
+only the application release records the sync.
+
+An older bump that was skipped entirely, because a newer bump landed before
+Argo CD synced, never ran: its pods were never started, so it stays waiting at
+Reconcile.
+
+## Hand edits
+
+A config release is **flagged** when its new pods carry another `release-id`
+annotation or digest than the pod template did before the sync, from the
+last Deployment snapshot before the window. That is a hand edit to what runs,
+such as a manual rollback, and it bypassed CI. The UI shows a HAND EDIT tag
+and the reason, for example:
+
+> A commit without a CI release moved the pods from
+> `personal-site/c2cfca1/production/13` to `personal-site/ef8c431/production/12`
+
+A config release deployed together with an application release is not
+flagged, since the change came from CI's own bump. The release it moved the
+pods to is not reopened.
+
 ## Not yet handled
 
-- **Deployed together (rule 2).** A human commit that lands on top of a
-  digest bump before Argo CD syncs means the bump's own commit is never
-  synced. The config release for the human commit records the rollout, which
-  carries the application release's annotation and digest, but the
-  application release stays waiting at Reconcile. Linking the two with
-  `deployed_with` comes next.
-- **Edits to release annotations.** A human commit that changes a
-  `mybuilds.brendanmanley.com/` annotation is recorded as a config release,
-  but not yet flagged as bypassing CI.
 - **A Deployment change that replaces no pods**, such as a replica count
   change alone, produces runtime events but no new ReplicaSet. Its Rollout
   stays running until the next sync ends it `unknown`.

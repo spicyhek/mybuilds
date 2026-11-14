@@ -473,7 +473,15 @@ func (f *fold) result() Projection {
 			stages[key].State = StateSkipped
 		}
 	} else if r.GitOpsSHA != "" {
-		steps = append(steps, f.reconcile(reconcile, r.GitOpsSHA)...)
+		revision := r.GitOpsSHA
+		if f.runtime != nil && f.runtime.Revision != "" {
+			revision = f.runtime.Revision
+		}
+		steps = append(steps, f.reconcile(reconcile, revision)...)
+		if revision != r.GitOpsSHA && reconcile.State == StateSucceeded {
+			// Rule 2: applied as part of a newer commit.
+			reconcile.Summary = fmt.Sprintf("Synced %s, which includes %s", short(revision, 7), short(r.GitOpsSHA, 7))
+		}
 	}
 	rsteps, samples := f.runtimeStages(&r, stages)
 	steps = append(steps, rsteps...)
@@ -490,6 +498,9 @@ func (f *fold) result() Projection {
 func (f *fold) runtimeStages(r *Release, stages map[string]*Stage) ([]Step, []Sample) {
 	var steps []Step
 	rollout, verify := stages["rollout"], stages["verify"]
+	if f.runtime != nil {
+		r.DeployedWith = f.runtime.Partner
+	}
 	// Rollout: the workload between this sync and the next (plan section
 	// 8.4). A failed sync applied nothing to roll out.
 	if !r.Superseded && r.GitOpsSHA != "" && f.runtime != nil && stages["reconcile"].State != StateFailed {
@@ -499,6 +510,7 @@ func (f *fold) runtimeStages(r *Release, stages map[string]*Stage) ([]Step, []Sa
 			r.ArtifactDigest = f.runtimeDigest
 			r.Artifact = f.svc.Artifact
 		}
+		r.Flag = handEditFlag(*r, f.runtime)
 	}
 	// A sync that replaced no pods (plan section 8.7): nothing to roll out
 	// or verify.
