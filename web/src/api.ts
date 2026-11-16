@@ -131,3 +131,17 @@ export const fetchRelease = (id: string) =>
   getJSON<Release>(`/api/v1/releases/${id.split("/").map(encodeURIComponent).join("/")}`);
 
 export const fetchMeta = () => getJSON<Meta>("/api/v1/meta");
+
+export interface Frame {
+  at: string;
+  event_type: string;
+  release: Release;
+}
+
+export interface Timeline {
+  release_id: string;
+  frames: Frame[];
+}
+
+export const fetchTimeline = (id: string) =>
+  getJSON<Timeline>(`/api/v1/releases/${id.split("/").map(encodeURIComponent).join("/")}/timeline`);

@@ -171,6 +171,7 @@ func run() error {
 		Logger:    logger,
 		Ingest:    ingester,
 		Hub:       hub,
+		Projector: projector,
 		Services:  svcs,
 		Fixtures:  cfg.Fixtures,
 		Web:       dist,

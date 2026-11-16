@@ -15,13 +15,20 @@ interface Props {
   sub?: ReactNode;
   /** Extra controls in the card head, before the outcome pill. */
   actions?: ReactNode;
+  /**
+   * Set while replaying: the badge replaces LIVE, and the final frame's
+   * steps show dimmed until playback reaches them.
+   */
+  replay?: { badge: string; final?: Release };
+  /** Playback controls, under the card head. */
+  controls?: ReactNode;
 }
 
 /**
  * The release player: pipeline, status line and stage detail panel. The
  * panel follows the active stage until a stage is clicked.
  */
-export function Player({ release: r, service, now, heading, sub, actions }: Props) {
+export function Player({ release: r, service, now, heading, sub, actions, replay, controls }: Props) {
   const [pinned, setPinned] = useState<{ release: string; stage: string } | null>(null);
   const pinnedStage = pinned?.release === r.release_id ? pinned.stage : null;
 
@@ -38,11 +45,16 @@ export function Player({ release: r, service, now, heading, sub, actions }: Prop
     <section className="card" aria-label="Release player">
       <div className="card-head">
         <span>{heading}</span>
-        {r.status === "running" && <span className="badge badge-live">LIVE</span>}
+        {replay ? (
+          <span className="badge badge-replay">{replay.badge}</span>
+        ) : (
+          r.status === "running" && <span className="badge badge-live">LIVE</span>
+        )}
         <span className="spacer" />
         {actions}
         <OutcomePill release={r} />
       </div>
+      {controls}
       <div className="card-body">
         <div className="pl-top">
           <div style={{ minWidth: 0 }}>
@@ -75,7 +87,16 @@ export function Player({ release: r, service, now, heading, sub, actions }: Prop
           />
         </div>
         <StatusLine release={r} />
-        {focusStage && <StagePanel release={r} stage={focusStage} service={service} now={now} pinned={pinnedStage !== null} />}
+        {focusStage && (
+          <StagePanel
+            release={r}
+            stage={focusStage}
+            service={service}
+            now={now}
+            pinned={pinnedStage !== null}
+            upcoming={replay?.final?.stages.find((s) => s.key === focusStage.key)?.steps}
+          />
+        )}
       </div>
     </section>
   );

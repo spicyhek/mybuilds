@@ -124,6 +124,7 @@ export function History({ query, live, services, now }: Props) {
         now={now}
         empty={loading ? "Loading…" : "No releases match the filters."}
         onSelect={(id) => navigate(releasePath(id))}
+        onReplay={(id) => navigate(`${releasePath(id)}?replay=1`)}
       />
       {cursor && (
         <div className="more">

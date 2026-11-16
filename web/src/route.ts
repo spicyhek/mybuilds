@@ -6,7 +6,7 @@ import { useEffect, useState, type MouseEvent } from "react";
 export type Route =
   | { name: "pipelines" }
   | { name: "history"; query: URLSearchParams }
-  | { name: "release"; id: string }
+  | { name: "release"; id: string; replay: boolean }
   | { name: "not-found" };
 
 export function parseRoute(path: string, search: string): Route {
@@ -25,7 +25,7 @@ export function parseRoute(path: string, search: string): Route {
         }
       })
       .join("/");
-    if (id) return { name: "release", id };
+    if (id) return { name: "release", id, replay: new URLSearchParams(search).get("replay") === "1" };
   }
   return { name: "not-found" };
 }
