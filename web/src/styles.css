@@ -73,6 +73,8 @@ a.brand:hover, .crumb-link:hover { color: var(--link); }
 .btn { font-size: 13px; font-weight: 500; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 7px; padding: 5px 14px; cursor: pointer; }
 .btn:hover:not(:disabled) { background: var(--surface-2); }
 .btn:disabled { color: var(--muted); cursor: default; }
+.btn-primary { background: var(--warn); border-color: var(--warn); color: var(--surface); font-weight: 600; }
+.btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--warn) 85%, var(--text)); }
 .top-actions { display: flex; align-items: center; gap: 14px; }
 .conn { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; font-size: 13px; color: var(--muted); }
 .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--subtle); }
@@ -130,7 +132,7 @@ main { padding: 20px 16px 56px; max-width: 1440px; margin: 0 auto; }
 .badge-replay { background: var(--warn-bg); color: var(--warn); }
 .replay-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 16px; border-top: 1px solid var(--border); background: var(--surface-2); }
 .btn-icon { padding: 3px 9px; line-height: 1.2; min-width: 32px; }
-.scrub { flex: 1 1 140px; min-width: 120px; accent-color: var(--warn); }
+.scrub { flex: 1 1 140px; min-width: 120px; accent-color: var(--run); }
 .replay-pos { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 88px; }
 .replay-btn { margin-left: 8px; font-size: 12px; padding: 2px 8px; }
 

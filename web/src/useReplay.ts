@@ -95,7 +95,7 @@ export interface Replay {
  * Drives playback of a timeline. With reduced motion, timers jump from frame
  * to frame instead of counting through gaps.
  */
-export function useReplay(frames: Frame[], autoplay: boolean, initialSpeed: Speed = 4): Replay {
+export function useReplay(frames: Frame[], autoplay = false, initialSpeed: Speed = 1): Replay {
   const sched = useMemo(() => schedule(frames), [frames]);
   const [pos, setPosState] = useState(0);
   const posRef = useRef(0);

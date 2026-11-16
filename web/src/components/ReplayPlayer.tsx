@@ -6,7 +6,8 @@ import { Player } from "./Player";
 interface Props {
   releaseId: string;
   service?: Service;
-  autoplay: boolean;
+  /** Start playing once loaded. Off by default: the visitor presses Play. */
+  autoplay?: boolean;
   speed?: Speed;
   heading?: string;
   /** Shown as an "Exit replay" control; omit to hide it. */
@@ -24,7 +25,7 @@ const recorded = (iso: string) =>
  * Replays a release from its server-side timeline with the same Player the
  * live view uses (plan section 7.3). It never projects anything itself.
  */
-export function ReplayPlayer({ releaseId, service, autoplay, speed, heading = "Replay", onExit, onEnded, onUnavailable }: Props) {
+export function ReplayPlayer({ releaseId, service, autoplay = false, speed, heading = "Replay", onExit, onEnded, onUnavailable }: Props) {
   const [frames, setFrames] = useState<Frame[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -102,8 +103,14 @@ function Loaded({
           ⏸
         </button>
       ) : (
-        <button type="button" className="btn btn-icon" onClick={rp.play} aria-label={rp.ended ? "Replay again" : "Play"} title={rp.ended ? "Replay again" : "Play"}>
-          {rp.ended ? "↻" : "▶"}
+        <button
+          type="button"
+          className={`btn btn-icon${rp.pos === 0 ? " btn-primary" : ""}`}
+          onClick={rp.play}
+          aria-label={rp.ended ? "Replay again" : "Play"}
+          title={rp.ended ? "Replay again" : "Play"}
+        >
+          {rp.ended ? "↻" : rp.pos === 0 ? "▶ Play replay" : "▶"}
         </button>
       )}
       <button
