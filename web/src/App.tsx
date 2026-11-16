@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { fetchMeta, type Meta, type Release } from "./api";
 import { GitHubIcon, MoonIcon, SunIcon } from "./components/Icons";
 import { Player } from "./components/Player";
@@ -9,7 +9,6 @@ import { History } from "./pages/History";
 import { ReleasePage } from "./pages/ReleasePage";
 import { onLinkClick, releasePath, useRoute } from "./route";
 import { useLiveReleases } from "./useLiveReleases";
-import { prefersReducedMotion } from "./useReplay";
 
 type Theme = "light" | "dark" | null;
 
@@ -190,9 +189,9 @@ function Pipelines({ live, meta, services, now, onPlaying }: PipelinesProps) {
   const [picked, setPicked] = useState<string | null>(null);
   const [showDrills, setShowDrills] = useState(true);
   const [service, setService] = useState("");
-  // A replay in the player: picked from a row, or the idle autoplay.
-  const [replay, setReplay] = useState<{ id: string; auto: boolean } | null>(null);
-  const autoplayed = useRef(false);
+  // The release replaying in the player. Clicking a finished release
+  // replays it; nothing plays on its own.
+  const [replay, setReplay] = useState<string | null>(null);
 
   const visible = useMemo(
     () => releases.filter((r) => (showDrills || !r.drill) && (!service || r.service === service)),
@@ -215,21 +214,6 @@ function Pipelines({ live, meta, services, now, onPlaying }: PipelinesProps) {
     onPlaying(playing ?? null);
   }, [playing, onPlaying]);
 
-  // Plan section 7.3: when nothing is deploying, play the most recent
-  // release once. Never with reduced motion, and never over live activity.
-  const anyRunning = releases.some((r) => r.status === "running");
-  useEffect(() => {
-    if (autoplayed.current || releases.length === 0) return;
-    autoplayed.current = true;
-    if (anyRunning || prefersReducedMotion()) return;
-    setReplay({ id: releases[0]!.release_id, auto: true });
-  }, [releases, anyRunning]);
-  // Live activity ends an autoplay; a replay the visitor asked for stays.
-  useEffect(() => {
-    if (lastTouched) setReplay((r) => (r?.auto ? null : r));
-  }, [lastTouched]);
-  const endAutoplay = useCallback(() => setReplay((r) => (r?.auto ? null : r)), []);
-
   // Steps come with the single-release endpoint; load them once per release.
   useEffect(() => {
     if (playing && !playing.stages.some((s) => s.steps)) void loadDetail(playing.release_id);
@@ -239,14 +223,14 @@ function Pipelines({ live, meta, services, now, onPlaying }: PipelinesProps) {
     <>
       {replay ? (
         <ReplayPlayer
-          key={replay.id}
-          releaseId={replay.id}
-          service={meta?.services.find((s) => s.name === replay.id.split("/")[0])}
+          key={replay}
+          releaseId={replay}
+          service={meta?.services.find((s) => s.name === replay.split("/")[0])}
           autoplay
-          heading={replay.auto ? "Latest release" : "Replay"}
-          onExit={() => setReplay(null)}
-          onEnded={endAutoplay}
-          onUnavailable={replay.auto ? endAutoplay : undefined}
+          onExit={() => {
+            setReplay(null);
+            setPicked(null);
+          }}
         />
       ) : playing ? (
         <Player
@@ -303,12 +287,15 @@ function Pipelines({ live, meta, services, now, onPlaying }: PipelinesProps) {
           selected={playing?.release_id}
           empty="No releases yet."
           onSelect={(id) => {
-            setReplay(null);
-            setPicked(id === picked ? null : id);
-          }}
-          onReplay={(id) => {
+            if (id === picked) {
+              setPicked(null);
+              setReplay(null);
+              return;
+            }
             setPicked(id);
-            setReplay({ id, auto: false });
+            // A running release is already live; a finished one replays.
+            const r = releases.find((x) => x.release_id === id);
+            setReplay(r && r.status !== "running" ? id : null);
           }}
         />
       </section>

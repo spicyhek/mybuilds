@@ -56,10 +56,9 @@ empty timeline.
 - A `REPLAY · recorded <date> · 4×` badge takes the place of `LIVE`.
 - The stage detail panel follows playback. Steps that playback has not
   reached yet show dimmed.
-- When no release is running, the homepage plays the most recent release
-  once, then returns to the normal view. Live activity ends the autoplay. With
-  `prefers-reduced-motion`, autoplay is off, and timers jump from frame to
-  frame instead of counting through gaps.
-- Every finished release row on the homepage and in the history screen has a
-  Replay button. On a release's page, `?replay=1` starts the replay, so a
-  replay can be shared.
+- Nothing plays on its own. On the homepage, clicking a finished release
+  replays it in the player; clicking a running one shows it live. In the
+  history screen, each finished release has a Replay button, and on a
+  release's page, `?replay=1` starts the replay, so a replay can be shared.
+- With `prefers-reduced-motion`, timers jump from frame to frame instead of
+  counting through gaps.
