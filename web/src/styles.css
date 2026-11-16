@@ -210,8 +210,8 @@ main { padding: 20px 16px 56px; max-width: 1440px; margin: 0 auto; }
 .row:hover { background: color-mix(in srgb, var(--surface-2) 55%, var(--surface)); }
 .row.sel { box-shadow: inset 3px 0 0 var(--link); }
 .rel-l1 { display: flex; align-items: center; gap: 7px; font-weight: 600; flex-wrap: wrap; }
-.rel-l2 { color: var(--muted); font-size: 12.5px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.c-rel { min-width: 0; }
+.rel-l2 { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; overflow-wrap: anywhere; }
+.c-rel { display: block; min-width: 0; }
 .c-start, .c-dur { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
 .mini { display: flex; gap: 3px; }
 .seg { width: 24px; height: 22px; border-radius: 5px; display: grid; place-items: center; border: 1px solid var(--border-strong); color: var(--subtle); background: var(--surface); }
