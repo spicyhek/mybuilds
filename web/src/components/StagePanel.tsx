@@ -1,4 +1,4 @@
-import type { Release, Service, Stage } from "../api";
+import type { Release, Service, Stage, Step } from "../api";
 import { STATE_LABEL, repoName, shortDigest, shortSha, stageLabel, stepTimer } from "../format";
 import { StateIcon } from "./Icons";
 
@@ -8,6 +8,8 @@ interface Props {
   service?: Service;
   now: number;
   pinned: boolean;
+  /** In a replay, the stage's final steps; those not reached yet show dimmed. */
+  upcoming?: Step[];
 }
 
 const PROVIDER: Record<string, string> = {
@@ -22,8 +24,10 @@ const PROVIDER: Record<string, string> = {
 };
 
 /** Where a stage runs and what it did: the "where" rows and the steps. */
-export function StagePanel({ release, stage, service, now, pinned }: Props) {
+export function StagePanel({ release, stage, service, now, pinned, upcoming }: Props) {
   const steps = stage.steps ?? [];
+  const seen = new Set(steps.map((s) => `${s.position}-${s.name}`));
+  const ahead = (upcoming ?? []).filter((s) => !seen.has(`${s.position}-${s.name}`));
   return (
     <div className="stage-panel" aria-label="Stage detail">
       <div className="sp-head">
@@ -43,7 +47,7 @@ export function StagePanel({ release, stage, service, now, pinned }: Props) {
             <WhereRow key={k} k={k} v={v} mono={mono} />
           ))}
         </dl>
-        {steps.length > 0 ? (
+        {steps.length + ahead.length > 0 ? (
           <ol className="steps">
             {steps.map((s) => (
               <li key={`${s.position}-${s.name}`} className={`step st-${s.state}`}>
@@ -56,6 +60,15 @@ export function StagePanel({ release, stage, service, now, pinned }: Props) {
                 </span>
                 <span className="tm">{stepTimer(s, now)}</span>
                 {s.detail && <span className="dt">{s.detail}</span>}
+              </li>
+            ))}
+            {ahead.map((s) => (
+              <li key={`${s.position}-${s.name}`} className="step st-upcoming" aria-label={`${s.name}, not reached yet`}>
+                <span className="ic">
+                  <StateIcon state="pending" />
+                </span>
+                <span className="nm">{s.name}</span>
+                <span className="tm" />
               </li>
             ))}
           </ol>

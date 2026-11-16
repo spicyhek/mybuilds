@@ -231,6 +231,12 @@ func decodeCursor(v string) (storage.ReleaseCursor, error) {
 
 func (s *server) getRelease(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	// No release ID ends in /timeline: its last part is a run number or an
+	// environment.
+	if base, ok := strings.CutSuffix(id, "/timeline"); ok {
+		s.timeline(w, r, base)
+		return
+	}
 	if id == "" {
 		writeError(w, http.StatusNotFound, "release not found")
 		return
@@ -247,4 +253,45 @@ func (s *server) getRelease(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, toView(*rel))
+}
+
+type frameView struct {
+	At        time.Time   `json:"at"`
+	EventType string      `json:"event_type"`
+	Release   releaseView `json:"release"`
+}
+
+type timelineResponse struct {
+	ReleaseID string      `json:"release_id"`
+	Frames    []frameView `json:"frames"`
+}
+
+// timeline serves GET /api/v1/releases/{id}/timeline: every state the
+// release passed through, each built by the projector from the events that
+// had occurred by then (plan section 7.3). It uses the same allowlisted view
+// as every other endpoint.
+func (s *server) timeline(w http.ResponseWriter, r *http.Request, id string) {
+	if s.projector == nil {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	if _, err := s.store.GetRelease(r.Context(), id); errors.Is(err, storage.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "release not found")
+		return
+	} else if err != nil {
+		s.logger.Error("get release", "release_id", id, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	frames, err := s.projector.Timeline(r.Context(), id)
+	if err != nil {
+		s.logger.Error("timeline", "release_id", id, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	resp := timelineResponse{ReleaseID: id, Frames: make([]frameView, 0, len(frames))}
+	for _, f := range frames {
+		resp.Frames = append(resp.Frames, frameView{At: f.At, EventType: f.EventType, Release: toView(f.Release)})
+	}
+	writeJSON(w, http.StatusOK, resp)
 }

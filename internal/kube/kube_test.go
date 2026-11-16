@@ -158,6 +158,8 @@ type harness struct {
 	nextEvent int
 	// serving is the release-id annotation of the pods rollout starts.
 	serving string
+	// after runs once each event has been stored and projected.
+	after func()
 }
 
 func newHarness(t *testing.T) *harness {
@@ -188,6 +190,9 @@ func newHarness(t *testing.T) *harness {
 func (h *harness) observe(s int, obj any) {
 	h.now = at(s)
 	h.w.handle(h.ctx, change{obj: obj})
+	if h.after != nil {
+		h.after()
+	}
 }
 
 // provider stores and projects one non-runtime event, as ingestion does.
@@ -202,6 +207,9 @@ func (h *harness) provider(provider, typ string, s int, keys events.Keys, payloa
 	}
 	if _, err := h.projector.ProjectEvent(h.ctx, *ev); err != nil {
 		h.t.Fatal(err)
+	}
+	if h.after != nil {
+		h.after()
 	}
 }
 
@@ -247,6 +255,12 @@ func (h *harness) configSync(gitops string, started, finished int) string {
 }
 
 func (h *harness) rollout(hash, revision string, base int, digest string) {
+	h.rolloutWith(hash, revision, base, digest, nil)
+}
+
+// rolloutWith is rollout with mid run once the first new pod exists, at
+// base+2, so a test can deliver another event in time order.
+func (h *harness) rolloutWith(hash, revision string, base int, digest string, mid func()) {
 	gen := int64(50 + base)
 	// The Deployment's pod template matches the new ReplicaSet's.
 	dep := func(d *appsv1.Deployment) *appsv1.Deployment {
@@ -264,6 +278,9 @@ func (h *harness) rollout(hash, revision string, base int, digest string) {
 	}
 	h.observe(base+1, rs)
 	h.observe(base+2, pod(hash, "a", base+1, 0, digest))
+	if mid != nil {
+		mid()
+	}
 	h.observe(base+8, pod(hash, "a", base+1, base+8, digest))
 	h.observe(base+9, pod(hash, "b", base+8, 0, digest))
 	h.observe(base+13, pod(hash, "b", base+8, base+13, digest))

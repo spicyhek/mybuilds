@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { fetchRelease, HTTPError, type Release, type Service } from "../api";
 import { Player } from "../components/Player";
-import { onLinkClick } from "../route";
+import { ReplayPlayer } from "../components/ReplayPlayer";
+import { navigate, onLinkClick, releasePath } from "../route";
 import { sameShape } from "../useLiveReleases";
 
 interface Props {
   id: string;
+  /** Start in replay, from ?replay=1. */
+  replay: boolean;
   /** Live copies from the stream; a change refetches the release. */
   live: Release[];
   services: Service[];
@@ -14,7 +17,7 @@ interface Props {
 }
 
 /** One release at its shareable URL, /releases/{release_id}. */
-export function ReleasePage({ id, live, services, now, onLoaded }: Props) {
+export function ReleasePage({ id, replay, live, services, now, onLoaded }: Props) {
   const [rel, setRel] = useState<Release | null>(null);
   const [state, setState] = useState<"loading" | "ok" | "missing" | "error">("loading");
   const [copied, setCopied] = useState(false);
@@ -78,6 +81,9 @@ export function ReleasePage({ id, live, services, now, onLoaded }: Props) {
     );
   }
 
+  const service = services.find((s) => s.name === rel.service);
+  const setReplay = (on: boolean) => navigate(on ? `${releasePath(id)}?replay=1` : releasePath(id), { replace: true });
+
   const copy = () => {
     void navigator.clipboard?.writeText(window.location.href).then(() => {
       setCopied(true);
@@ -85,16 +91,29 @@ export function ReleasePage({ id, live, services, now, onLoaded }: Props) {
     });
   };
 
+  const copyButton = (
+    <button type="button" className="linkish" onClick={copy}>
+      {copied ? "Link copied" : "Copy link"}
+    </button>
+  );
+  if (replay) {
+    return <ReplayPlayer releaseId={id} service={service} autoplay onExit={() => setReplay(false)} />;
+  }
   return (
     <Player
       release={rel}
-      service={services.find((s) => s.name === rel.service)}
+      service={service}
       now={now}
       heading="Release"
       actions={
-        <button type="button" className="linkish" onClick={copy}>
-          {copied ? "Link copied" : "Copy link"}
-        </button>
+        <>
+          {rel.status !== "running" && (
+            <button type="button" className="btn replay-btn" onClick={() => setReplay(true)}>
+              Replay
+            </button>
+          )}
+          {copyButton}
+        </>
       }
     />
   );

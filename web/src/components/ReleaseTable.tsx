@@ -8,9 +8,10 @@ interface Props {
   selected?: string;
   empty: string;
   onSelect: (id: string) => void;
+  onReplay?: (id: string) => void;
 }
 
-export function ReleaseTable({ label, releases, now, selected, empty, onSelect }: Props) {
+export function ReleaseTable({ label, releases, now, selected, empty, onSelect, onReplay }: Props) {
   return (
     <div role="table" aria-label={label}>
       <div className="tr th" role="row">
@@ -23,7 +24,7 @@ export function ReleaseTable({ label, releases, now, selected, empty, onSelect }
       {releases.length === 0 ? (
         <div className="empty">{empty}</div>
       ) : (
-        releases.map((r) => <ReleaseRow key={r.release_id} release={r} now={now} selected={selected === r.release_id} onSelect={onSelect} />)
+        releases.map((r) => <ReleaseRow key={r.release_id} release={r} now={now} selected={selected === r.release_id} onSelect={onSelect} onReplay={onReplay} />)
       )}
     </div>
   );

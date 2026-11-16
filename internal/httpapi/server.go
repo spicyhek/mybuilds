@@ -12,6 +12,7 @@ import (
 
 	"github.com/spicyhek/mybuilds/internal/events"
 	"github.com/spicyhek/mybuilds/internal/ingest"
+	"github.com/spicyhek/mybuilds/internal/releases"
 	"github.com/spicyhek/mybuilds/internal/services"
 	"github.com/spicyhek/mybuilds/internal/storage"
 )
@@ -27,6 +28,8 @@ type Options struct {
 	Ingest *ingest.Ingester
 	// Hub feeds the SSE stream. Nil leaves the stream route out.
 	Hub *Hub
+	// Projector serves release timelines for replay. Nil leaves them out.
+	Projector *releases.Projector
 	// Services is the service map, described by GET /api/v1/meta.
 	Services services.Map
 	// Fixtures reports fixture mode to the UI.
@@ -43,6 +46,7 @@ type server struct {
 	metrics   *Metrics
 	logger    *slog.Logger
 	hub       *Hub
+	projector *releases.Projector
 	services  services.Map
 	fixtures  bool
 }
@@ -56,6 +60,7 @@ func New(o Options) http.Handler {
 		metrics:   o.Metrics,
 		logger:    o.Logger,
 		hub:       o.Hub,
+		projector: o.Projector,
 		services:  o.Services,
 		fixtures:  o.Fixtures,
 	}
@@ -68,7 +73,7 @@ func New(o Options) http.Handler {
 	mux.HandleFunc("GET /readyz", s.readyz)
 	mux.HandleFunc("GET /api/v1/releases", s.listReleases)
 	// Release IDs contain slashes (service/sha/environment/run), so the
-	// wildcard has to take the rest of the path.
+	// wildcard has to take the rest of the path, including /timeline.
 	mux.HandleFunc("GET /api/v1/releases/{id...}", s.getRelease)
 	mux.HandleFunc("GET /api/v1/meta", s.meta)
 	if s.hub != nil {

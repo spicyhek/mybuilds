@@ -105,36 +105,58 @@ func (p *Projector) ProjectRelease(ctx context.Context, releaseID string) (creat
 }
 
 func (p *Projector) projectRelease(ctx context.Context, releaseID string) (created bool, partner string, err error) {
-	evs, err := p.store.ReleaseEvents(ctx, releaseID)
-	if err != nil {
-		return false, "", fmt.Errorf("load events of %s: %w", releaseID, err)
-	}
-	parts, err := ParseReleaseID(releaseID)
+	in, err := p.inputs(ctx, releaseID)
 	if err != nil {
 		return false, "", err
 	}
-	// An unknown service still projects; its jobs just map to no stage.
-	svc, _ := p.services.ByName(parts.Service)
-	proj, err := Project(releaseID, evs, svc)
+	proj, err := ProjectWithRuntime(releaseID, in.events, in.svc, in.runtime)
 	if err != nil {
 		return false, "", fmt.Errorf("project %s: %w", releaseID, err)
-	}
-	// The runtime window depends on the GitOps commit, which only the first
-	// pass knows.
-	rt, extra, err := p.runtime(ctx, svc, proj.Release)
-	if err != nil {
-		return false, "", fmt.Errorf("runtime of %s: %w", releaseID, err)
-	}
-	if rt != nil {
-		if proj, err = ProjectWithRuntime(releaseID, append(evs, extra...), svc, rt); err != nil {
-			return false, "", fmt.Errorf("project %s: %w", releaseID, err)
-		}
 	}
 	created, err = p.store.SaveProjection(ctx, proj)
 	if err != nil {
 		return false, "", fmt.Errorf("save %s: %w", releaseID, err)
 	}
 	return created, proj.Release.DeployedWith, nil
+}
+
+// projectionInputs is everything a release's projection reads.
+type projectionInputs struct {
+	svc services.Service
+	// events are the release's own events and any it shares with a release
+	// deployed together with it.
+	events  []events.Event
+	runtime *Runtime
+}
+
+func (p *Projector) inputs(ctx context.Context, releaseID string) (projectionInputs, error) {
+	var in projectionInputs
+	evs, err := p.store.ReleaseEvents(ctx, releaseID)
+	if err != nil {
+		return in, fmt.Errorf("load events of %s: %w", releaseID, err)
+	}
+	parts, err := ParseReleaseID(releaseID)
+	if err != nil {
+		return in, err
+	}
+	// An unknown service still projects; its jobs just map to no stage.
+	in.svc, _ = p.services.ByName(parts.Service)
+	in.events = evs
+	first, err := Project(releaseID, evs, in.svc)
+	if err != nil {
+		return in, fmt.Errorf("project %s: %w", releaseID, err)
+	}
+	// The runtime window depends on the GitOps commit, which only the first
+	// pass knows.
+	rt, extra, err := p.runtime(ctx, in.svc, first.Release)
+	if err != nil {
+		return in, fmt.Errorf("runtime of %s: %w", releaseID, err)
+	}
+	if rt != nil {
+		in.runtime = rt
+		in.events = append(evs, extra...)
+	}
+	return in, nil
 }
 
 // adoptionGrace allows for Argo CD starting a sync of a commit that contains

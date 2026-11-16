@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { fetchMeta, type Meta, type Release } from "./api";
 import { GitHubIcon, MoonIcon, SunIcon } from "./components/Icons";
 import { Player } from "./components/Player";
+import { ReplayPlayer } from "./components/ReplayPlayer";
 import { ReleaseDetails } from "./components/ReleaseDetails";
 import { ReleaseTable } from "./components/ReleaseTable";
 import { History } from "./pages/History";
 import { ReleasePage } from "./pages/ReleasePage";
 import { onLinkClick, releasePath, useRoute } from "./route";
 import { useLiveReleases } from "./useLiveReleases";
+import { prefersReducedMotion } from "./useReplay";
 
 type Theme = "light" | "dark" | null;
 
@@ -70,7 +72,7 @@ export default function App() {
       break;
     case "release":
       crumb = route.id;
-      content = <ReleasePage id={route.id} live={releases} services={meta?.services ?? []} now={now} onLoaded={onRouted} />;
+      content = <ReleasePage id={route.id} replay={route.replay} live={releases} services={meta?.services ?? []} now={now} onLoaded={onRouted} />;
       detail = routed ?? undefined;
       break;
     default:
@@ -188,6 +190,9 @@ function Pipelines({ live, meta, services, now, onPlaying }: PipelinesProps) {
   const [picked, setPicked] = useState<string | null>(null);
   const [showDrills, setShowDrills] = useState(true);
   const [service, setService] = useState("");
+  // A replay in the player: picked from a row, or the idle autoplay.
+  const [replay, setReplay] = useState<{ id: string; auto: boolean } | null>(null);
+  const autoplayed = useRef(false);
 
   const visible = useMemo(
     () => releases.filter((r) => (showDrills || !r.drill) && (!service || r.service === service)),
@@ -210,6 +215,21 @@ function Pipelines({ live, meta, services, now, onPlaying }: PipelinesProps) {
     onPlaying(playing ?? null);
   }, [playing, onPlaying]);
 
+  // Plan section 7.3: when nothing is deploying, play the most recent
+  // release once. Never with reduced motion, and never over live activity.
+  const anyRunning = releases.some((r) => r.status === "running");
+  useEffect(() => {
+    if (autoplayed.current || releases.length === 0) return;
+    autoplayed.current = true;
+    if (anyRunning || prefersReducedMotion()) return;
+    setReplay({ id: releases[0]!.release_id, auto: true });
+  }, [releases, anyRunning]);
+  // Live activity ends an autoplay; a replay the visitor asked for stays.
+  useEffect(() => {
+    if (lastTouched) setReplay((r) => (r?.auto ? null : r));
+  }, [lastTouched]);
+  const endAutoplay = useCallback(() => setReplay((r) => (r?.auto ? null : r)), []);
+
   // Steps come with the single-release endpoint; load them once per release.
   useEffect(() => {
     if (playing && !playing.stages.some((s) => s.steps)) void loadDetail(playing.release_id);
@@ -217,7 +237,18 @@ function Pipelines({ live, meta, services, now, onPlaying }: PipelinesProps) {
 
   return (
     <>
-      {playing ? (
+      {replay ? (
+        <ReplayPlayer
+          key={replay.id}
+          releaseId={replay.id}
+          service={meta?.services.find((s) => s.name === replay.id.split("/")[0])}
+          autoplay
+          heading={replay.auto ? "Latest release" : "Replay"}
+          onExit={() => setReplay(null)}
+          onEnded={endAutoplay}
+          onUnavailable={replay.auto ? endAutoplay : undefined}
+        />
+      ) : playing ? (
         <Player
           release={playing}
           service={meta?.services.find((s) => s.name === playing.service)}
@@ -271,7 +302,14 @@ function Pipelines({ live, meta, services, now, onPlaying }: PipelinesProps) {
           now={now}
           selected={playing?.release_id}
           empty="No releases yet."
-          onSelect={(id) => setPicked(id === picked ? null : id)}
+          onSelect={(id) => {
+            setReplay(null);
+            setPicked(id === picked ? null : id);
+          }}
+          onReplay={(id) => {
+            setPicked(id);
+            setReplay({ id, auto: false });
+          }}
         />
       </section>
     </>

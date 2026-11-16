@@ -8,9 +8,11 @@ interface Props {
   now: number;
   selected: boolean;
   onSelect: (id: string) => void;
+  /** Shows a Replay button. */
+  onReplay?: (id: string) => void;
 }
 
-export function ReleaseRow({ release: r, now, selected, onSelect }: Props) {
+export function ReleaseRow({ release: r, now, selected, onSelect, onReplay }: Props) {
   const sha = r.kind === "config" ? r.gitops_sha : r.source_sha;
   const outcome = r.superseded ? "skipped" : r.status;
   return (
@@ -58,6 +60,20 @@ export function ReleaseRow({ release: r, now, selected, onSelect }: Props) {
           <StateIcon state={outcome} />
           {OUTCOME_LABEL[outcome]}
         </span>
+        {onReplay && r.status !== "running" && (
+          <button
+            type="button"
+            className="btn replay-btn"
+            aria-label={`Replay ${r.release_id}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onReplay(r.release_id);
+            }}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            Replay
+          </button>
+        )}
       </span>
       <span className="c-start" role="cell">
         {relTime(r.created_at, now)}
