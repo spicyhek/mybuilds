@@ -97,7 +97,7 @@ export function ReleasePage({ id, replay, live, services, now, onLoaded }: Props
     </button>
   );
   if (replay) {
-    return <ReplayPlayer releaseId={id} service={service} autoplay onExit={() => setReplay(false)} />;
+    return <ReplayPlayer releaseId={id} service={service} onExit={() => setReplay(false)} />;
   }
   return (
     <Player

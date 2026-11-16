@@ -226,7 +226,6 @@ function Pipelines({ live, meta, services, now, onPlaying }: PipelinesProps) {
           key={replay}
           releaseId={replay}
           service={meta?.services.find((s) => s.name === replay.split("/")[0])}
-          autoplay
           onExit={() => {
             setReplay(null);
             setPicked(null);

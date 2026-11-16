@@ -48,12 +48,13 @@ empty timeline.
 
 ## Playback
 
-- Play and pause, 1×, 4× and 16× speeds, a scrubber, and previous and next
-  event.
+- A replay loads paused at its first event and starts when Play is pressed.
+- Play and pause, 1× (the default), 4× and 16× speeds, a scrubber, and
+  previous and next event.
 - Gaps longer than 3 seconds play as 1.5 seconds and show "⋯ 6m 12s later".
   Real time runs faster through a compressed gap, so stage and step timers
   show the recorded durations.
-- A `REPLAY · recorded <date> · 4×` badge takes the place of `LIVE`.
+- A `REPLAY · recorded <date> · 1×` badge takes the place of `LIVE`.
 - The stage detail panel follows playback. Steps that playback has not
   reached yet show dimmed.
 - Nothing plays on its own. On the homepage, clicking a finished release
