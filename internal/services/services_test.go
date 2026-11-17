@@ -14,6 +14,18 @@ func TestBuiltInMap(t *testing.T) {
 	if _, ok := m.ByWorkflow("spicyhek/homelab-hosted-personal-site", ".github/workflows/ci.yml"); ok {
 		t.Error("another workflow of the repository matched")
 	}
+
+	// mybuilds tracks itself (plan section 8.8).
+	self, ok := m.ByWorkflow("spicyhek/mybuilds", ".github/workflows/release.yml")
+	if !ok || self.Name != "mybuilds" || self.ArgoCDApplication != "mybuilds" || self.WorkloadKey() != "default/mybuilds" {
+		t.Fatalf("mybuilds = %+v, %v", self, ok)
+	}
+	if stage, ok := self.JobStage("test"); !ok || stage != "build" {
+		t.Errorf("test job stage = %q, %v", stage, ok)
+	}
+	if self.Verify == nil || self.Verify.URL != "https://mybuilds.brendanmanley.com/healthz" {
+		t.Errorf("verify = %+v", self.Verify)
+	}
 }
 
 func TestStageForStep(t *testing.T) {

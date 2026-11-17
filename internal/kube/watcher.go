@@ -27,6 +27,11 @@ import (
 // keeps reads off the k3s datastore on the contended control-plane disk.
 const DefaultResync = 30 * time.Minute
 
+// flushTimeout bounds how long the watch keeps recording after it is told to
+// stop. A pod that its own release replaces sees its Deployment change just
+// before SIGTERM, and records it within the grace period (plan section 8.8).
+const flushTimeout = 5 * time.Second
+
 // Store is what the watcher needs from storage.
 type Store interface {
 	InsertEvent(ctx context.Context, e *events.Event) (bool, error)
@@ -85,6 +90,8 @@ type Watcher struct {
 	core  rest.Interface
 	opts  Options
 	queue chan change
+	// done is closed once Run has returned.
+	done chan struct{}
 
 	observed *prometheus.CounterVec
 	synced   prometheus.Gauge
@@ -128,6 +135,7 @@ func New(o Options) (*Watcher, error) {
 		core:  core,
 		opts:  o,
 		queue: make(chan change, 256),
+		done:  make(chan struct{}),
 		observed: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "mybuilds_runtime_events_total",
 			Help: "Kubernetes objects observed by the runtime watch, by kind and result.",
@@ -143,10 +151,12 @@ func New(o Options) (*Watcher, error) {
 	return w, nil
 }
 
-// Run starts the informers and records changes until ctx is done. List and
-// watch errors, such as missing RBAC, are retried by the informers with
-// backoff and logged; they never stop the server.
+// Run starts the informers and records changes until ctx is done, then
+// records what is still queued and returns. List and watch errors, such as
+// missing RBAC, are retried by the informers with backoff and logged; they
+// never stop the server.
 func (w *Watcher) Run(ctx context.Context) error {
+	defer close(w.done)
 	namespaces := w.opts.Services.Namespaces()
 	if len(namespaces) == 0 {
 		w.opts.Logger.Info("runtime watch idle: no service has a workload")
@@ -193,7 +203,11 @@ func (w *Watcher) Run(ctx context.Context) error {
 		}
 	}
 
-	go w.record(ctx)
+	recorded := make(chan struct{})
+	go func() {
+		defer close(recorded)
+		w.record(ctx)
+	}()
 	for _, inf := range informers {
 		go inf.Run(ctx.Done())
 	}
@@ -211,7 +225,13 @@ func (w *Watcher) Run(ctx context.Context) error {
 		w.opts.Logger.Info("runtime watch synced")
 	}
 	<-ctx.Done()
+	<-recorded
 	return nil
+}
+
+// Done is closed once Run has returned, with every queued change recorded.
+func (w *Watcher) Done() <-chan struct{} {
+	return w.done
 }
 
 func (w *Watcher) enqueue(ctx context.Context, obj any, deleted bool) {
@@ -222,16 +242,42 @@ func (w *Watcher) enqueue(ctx context.Context, obj any, deleted bool) {
 }
 
 // record stores changes one at a time, so events are numbered and projected
-// in the order they were observed.
+// in the order they were observed. Once ctx is done, it records what is
+// still queued, for up to flushTimeout, before returning.
 func (w *Watcher) record(ctx context.Context) {
+	// Storing and projecting an event is never cut short by the stop
+	// signal, only by the flush timeout.
+	work, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	for {
 		select {
 		case <-ctx.Done():
+			w.flush(work, cancel)
 			return
 		case c := <-w.queue:
-			w.handle(ctx, c)
+			w.handle(work, c)
 		}
 	}
+}
+
+func (w *Watcher) flush(work context.Context, cancel context.CancelFunc) {
+	timer := time.AfterFunc(flushTimeout, cancel)
+	defer timer.Stop()
+	flushed := 0
+	for work.Err() == nil {
+		select {
+		case c := <-w.queue:
+			w.handle(work, c)
+			flushed++
+		default:
+			if flushed > 0 {
+				w.opts.Logger.Info("runtime watch flushed", "events", flushed)
+			}
+			return
+		}
+	}
+	w.opts.Logger.Warn("runtime watch stopped before every change was recorded",
+		"recorded", flushed, "dropped", len(w.queue))
 }
 
 func (w *Watcher) handle(ctx context.Context, c change) {

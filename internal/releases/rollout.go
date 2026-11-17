@@ -92,11 +92,17 @@ const createdSlack = 5 * time.Second
 type rsObs struct {
 	rs      events.ReplicaSet
 	eventID int64
+	// firstSeen is when the watch first observed the ReplicaSet.
+	firstSeen time.Time
 }
 
 type podObs struct {
 	pod     events.Pod
 	eventID int64
+	// firstSeen is when the watch first observed the pod, and readySeen
+	// when it first observed the pod Ready.
+	firstSeen time.Time
+	readySeen *time.Time
 }
 
 // rolloutView is the workload as last observed.
@@ -105,6 +111,17 @@ type rolloutView struct {
 	depEvent int64
 	sets     map[string]rsObs
 	pods     map[string]podObs
+}
+
+// observationLag is how far behind a change an observation may be before
+// the step it produces is marked reconstructed. The watch sees a change
+// within a second or two, so a longer lag means nothing was watching when
+// the change happened, as during mybuilds' own rollout (plan section 8.8).
+// The step's times still come from the object, so they stay right.
+const observationLag = 15 * time.Second
+
+func lagged(happened, observed time.Time) bool {
+	return observed.Sub(happened) > observationLag
 }
 
 type rolloutResult struct {
@@ -135,13 +152,24 @@ func (v *rolloutView) apply(e events.Event) (bool, error) {
 		if err := e.Decode(&rs); err != nil {
 			return false, err
 		}
-		v.sets[rs.Name] = rsObs{rs: rs, eventID: e.ID}
+		obs := rsObs{rs: rs, eventID: e.ID, firstSeen: e.OccurredAt}
+		if prev, ok := v.sets[rs.Name]; ok {
+			obs.firstSeen = prev.firstSeen
+		}
+		v.sets[rs.Name] = obs
 	case events.TypePod:
 		var p events.Pod
 		if err := e.Decode(&p); err != nil {
 			return false, err
 		}
-		v.pods[p.Name] = podObs{pod: p, eventID: e.ID}
+		obs := podObs{pod: p, eventID: e.ID, firstSeen: e.OccurredAt}
+		if prev, ok := v.pods[p.Name]; ok {
+			obs.firstSeen, obs.readySeen = prev.firstSeen, prev.readySeen
+		}
+		if p.Ready && obs.readySeen == nil {
+			obs.readySeen = timePtr(e.OccurredAt)
+		}
+		v.pods[p.Name] = obs
 	default:
 		return false, nil
 	}
@@ -345,17 +373,22 @@ func rolloutSteps(v *rolloutView, res rolloutResult, digest, artifact string, ol
 	if rs.Revision != "" {
 		detail += ", revision " + rs.Revision
 	}
+	// A watch that missed the ReplicaSet's creation missed the start of the
+	// rollout, so the old pods' scale-down was not observed either.
+	rsLate := lagged(rs.CreatedAt, res.newRS.firstSeen)
 	add(Step{Name: "New ReplicaSet", State: StateSucceeded, StartedAt: timePtr(rs.CreatedAt),
-		CompletedAt: timePtr(rs.CreatedAt), Detail: detail, SourceEventID: res.newRS.eventID})
+		CompletedAt: timePtr(rs.CreatedAt), Detail: detail, SourceEventID: res.newRS.eventID, Reconstructed: rsLate})
 
 	for _, obs := range res.newPods {
 		state, completed, detail := podStep(obs.pod, artifact)
+		late := lagged(obs.pod.CreatedAt, obs.firstSeen) ||
+			(obs.readySeen != nil && obs.pod.ReadyChangedAt != nil && lagged(*obs.pod.ReadyChangedAt, *obs.readySeen))
 		add(Step{Name: "Pod " + obs.pod.Name, State: state, StartedAt: timePtr(obs.pod.CreatedAt),
-			CompletedAt: completed, Detail: detail, SourceEventID: obs.eventID})
+			CompletedAt: completed, Detail: detail, SourceEventID: obs.eventID, Reconstructed: late})
 	}
 
 	if d := v.dep; d != nil {
-		old := Step{Name: "Old pods scaled down", StartedAt: timePtr(rs.CreatedAt), SourceEventID: v.depEvent}
+		old := Step{Name: "Old pods scaled down", StartedAt: timePtr(rs.CreatedAt), SourceEventID: v.depEvent, Reconstructed: rsLate}
 		if remaining := d.StatusReplicas - d.UpdatedReplicas; oldScaledAt != nil && remaining <= 0 {
 			old.State, old.CompletedAt, old.Detail = StateSucceeded, oldScaledAt, "No old pods remain"
 		} else {

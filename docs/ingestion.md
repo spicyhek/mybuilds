@@ -22,6 +22,13 @@ Responses:
 | `422` | Authenticated but invalid, such as a release ID that does not match its fields. |
 | `503` | The endpoint's secret is not configured. |
 
+In production, a Cloudflare Worker on the same paths receives each request
+first, checks its size and signature the same way, and queues it; mybuilds
+drains the queue and checks the signature again ([`buffer.md`](buffer.md)).
+The Worker answers `202 {"outcome": "queued"}`, or the same `401`, `413` and
+`503` as below. The statuses below are mybuilds' own, which a sender sees
+when the Worker is not in front.
+
 A stored event is acknowledged even if re-projecting fails; the failure is
 logged, counted in `mybuilds_projection_errors_total`, and repaired by the
 next event of that release or by the rebuild at startup.
@@ -135,9 +142,12 @@ The configuration lives in homelab-infra's
 [`k8s/argocd/notifications/argocd-notifications-cm.yml`](https://github.com/spicyhek/homelab-infra/blob/main/k8s/argocd/notifications/argocd-notifications-cm.yml),
 synced by the `argocd-notifications` Application. In short:
 
-- The `mybuilds` webhook service posts to the cluster-internal Service
-  (`http://mybuilds.default.svc.cluster.local/hooks/argocd`), so a tunnel
-  outage cannot drop deploy evidence. Its bearer token is the
+- The `mybuilds` webhook service posts to the public URL
+  (`https://mybuilds.brendanmanley.com/hooks/argocd`), where the Worker
+  queues the notification, so one sent while mybuilds is restarting is kept.
+  Argo CD sends from inside the cluster, so the tunnel is not on that path;
+  without the Worker, the request reaches mybuilds through the tunnel
+  instead. Its bearer token is the
   `mybuilds-argocd-token` key of `argocd-notifications-secret`, the same value
   as `MYBUILDS_ARGOCD_TOKEN`.
 - Four triggers, `mybuilds-on-sync-running`, `-on-sync-succeeded`,

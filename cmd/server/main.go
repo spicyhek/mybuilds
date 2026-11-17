@@ -23,6 +23,7 @@ import (
 	"github.com/spicyhek/mybuilds/internal/fixtures"
 	"github.com/spicyhek/mybuilds/internal/httpapi"
 	"github.com/spicyhek/mybuilds/internal/ingest"
+	"github.com/spicyhek/mybuilds/internal/ingest/queue"
 	"github.com/spicyhek/mybuilds/internal/kube"
 	"github.com/spicyhek/mybuilds/internal/releases"
 	"github.com/spicyhek/mybuilds/internal/services"
@@ -117,6 +118,27 @@ func run() error {
 		"github", cfg.GitHubWebhookSecret != "",
 		"ci", cfg.CIEventSecret != "",
 		"argocd", cfg.ArgoCDToken != "")
+
+	// The off-cluster buffer's consumer (docs/buffer.md). Without a queue,
+	// only the direct endpoints receive.
+	if cfg.SQSQueueURL == "" || cfg.Fixtures {
+		logger.Info("queue consumer disabled", "configured", cfg.SQSQueueURL != "", "fixtures", cfg.Fixtures)
+	} else {
+		consumer, err := queue.New(queue.Options{
+			QueueURL:        cfg.SQSQueueURL,
+			Region:          cfg.SQSRegion,
+			AccessKeyID:     cfg.SQSAccessKeyID,
+			SecretAccessKey: cfg.SQSSecretAccessKey,
+			Ingester:        ingester,
+			Logger:          logger,
+			Registerer:      prometheus.DefaultRegisterer,
+		})
+		if err != nil {
+			return fmt.Errorf("queue consumer: %w", err)
+		}
+		go consumer.Run(ctx)
+		logger.Info("queue consumer starting", "queue", cfg.SQSQueueURL)
+	}
 
 	watcher := startRuntimeWatch(ctx, cfg, logger, svcs, store, projector, hub)
 
@@ -216,6 +238,15 @@ func run() error {
 	for _, srv := range []*http.Server{appServer, metricsServer} {
 		if err := srv.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			shutdownErr = errors.Join(shutdownErr, err)
+		}
+	}
+	// The runtime watch records what it saw before the signal, such as its
+	// own Deployment changing, before the database closes.
+	if watcher != nil {
+		select {
+		case <-watcher.Done():
+		case <-shutdownCtx.Done():
+			logger.Warn("runtime watch did not stop in time")
 		}
 	}
 	return shutdownErr

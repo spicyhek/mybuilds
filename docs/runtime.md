@@ -78,6 +78,26 @@ A failed Argo CD sync applied nothing, so Rollout is skipped.
 | Old pods scaled down | The Deployment's total replicas reaching its updated replicas |
 | Digest check | Every Ready new pod's `imageID` against the release digest |
 
+### Reconstructed steps
+
+Step times come from the objects, not from when the watch saw them: a
+ReplicaSet's and a pod's `creationTimestamp`, and the Ready condition's
+`lastTransitionTime`. So a rollout the watch only saw after the fact, from
+its initial list, still has the right times. Its steps are marked
+**reconstructed**, and the UI labels them so: a step is reconstructed when
+the watch first observed the object, or first saw the pod Ready, more than
+15 seconds after it happened. The "Old pods scaled down" step is
+reconstructed when the new ReplicaSet's creation was missed, since the
+scale-down around it was missed too. mybuilds' own rollouts always look
+like this (see [`self-tracking.md`](self-tracking.md)).
+
+## Shutdown
+
+On `SIGTERM`, the watch stops its informers and records what is still
+queued, for up to 5 seconds, before the database closes. A pod that its own
+release replaces sees its Deployment's new generation just before it is
+stopped, so the next version finds that the rollout started.
+
 ## Metrics
 
 | Metric | Meaning |

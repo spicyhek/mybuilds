@@ -6,7 +6,7 @@ verified public response, with each stage backed by its own evidence. A green
 CI run, an Argo CD sync, a Ready pod and a passing public check are four
 separate facts; mybuilds never treats one as proof of another.
 
-**Status: M3, history and replay.** The server receives signed GitHub, CI and Argo
+**Status: M4, tracking itself, with the ingestion buffer.** The server receives signed GitHub, CI and Argo
 CD events, watches its workloads through read-only Kubernetes informers,
 checks each release's public URL, stores every delivery, observation and
 check once, projects releases from Source through Verify, streams changes
@@ -14,7 +14,8 @@ over SSE and serves the React pipeline view. It runs on the cluster it
 watches. Human edits in homelab-infra become config releases with their own
 rollout and verification. Every release has a shareable URL,
 `/releases/{release_id}`, the history screen at `/history` filters them
-all, and any release can be replayed from its recorded events. `demo/index.html` is the standalone UI prototype the view was built
+all, and any release can be replayed from its recorded events. mybuilds
+tracks its own releases the same way ([`docs/self-tracking.md`](docs/self-tracking.md)). `demo/index.html` is the standalone UI prototype the view was built
 from.
 
 ## Layout
@@ -27,6 +28,7 @@ internal/events        normalized event types
 internal/ingest        authenticate, translate, store, re-project
   github, ci, argocd   one translator per provider
   verify               HMAC and bearer-token checks
+  queue                the ingestion buffer's consumer (SQS)
 internal/kube          read-only informers: Deployments, ReplicaSets, Pods
 internal/verifier      public checks after Rollout
 internal/releases      release model, correlation and the projector
@@ -34,16 +36,18 @@ internal/services      service map: repositories, workflows, jobs, apps
 internal/httpapi       health, read API, SSE stream, ingestion routes, static files, metrics
 internal/fixtures      sample releases and the recorded release replayed in fixture mode
 web/                   React + TypeScript frontend (Vite); dist/ is embedded into the binary
+worker/                Cloudflare Worker: the ingestion buffer's receiver
 docs/ingestion.md      the three ingestion contracts
 docs/runtime.md        the runtime watch and the Rollout stage
 docs/verification.md   the verifier and the Verify stage
 docs/config-releases.md config releases: GitOps commits no CI run made
 docs/replay.md         the timeline endpoint and replay
+docs/self-tracking.md  how mybuilds tracks its own releases
+docs/buffer.md         the off-cluster ingestion buffer: Worker, SQS, consumer
 demo/                  standalone UI prototype
 ```
 
-Planned, not yet present: `internal/ingest/queue` (SQS consumer),
-`worker/` (Cloudflare Worker) and `drill/`.
+Planned, not yet present: `drill/`.
 
 ## How events become releases
 
@@ -148,6 +152,9 @@ serves production, screenshots and the CI smoke test.
 API responses are built from an explicit allowlist of fields; internal IDs
 and raw provider payloads are never returned. The ingestion payloads,
 signatures and status codes are in [docs/ingestion.md](docs/ingestion.md).
+In production a Cloudflare Worker answers the three `POST` routes first and
+queues each delivery for mybuilds to drain ([docs/buffer.md](docs/buffer.md)),
+so a restart of the pod loses nothing.
 
 ## Container
 
