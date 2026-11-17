@@ -78,6 +78,11 @@ func (h *harness) selfContained(id string) {
 		t.Fatal(err)
 	}
 	want := h.timeline(id)
+	if len(want) > 0 {
+		if l, s := comparable(t, want[len(want)-1].Release), comparable(t, *h.get(id)); l != s {
+			t.Errorf("%s: the timeline's last frame is not the stored release:\n frame  %s\nstored %s", id, l, s)
+		}
+	}
 	if len(frames) != len(want) {
 		t.Errorf("%s from its exported events: %d frames, want %d", id, len(frames), len(want))
 		return

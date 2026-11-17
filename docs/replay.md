@@ -28,6 +28,9 @@ projects only what had occurred up to that event:
 - the runtime window does not exist before its sync started, and stays open
   until the next sync started, so a frame never shows a window that was
   closed later;
+- the next sync's start gets a frame of its own, because closing the window
+  can change the release (a rollout cut off there becomes unknown) and that
+  sync is not one of the release's events;
 - a frame that looks the same as the one before it is left out.
 
 The last frame equals the stored release. Each `release` uses the same

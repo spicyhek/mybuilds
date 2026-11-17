@@ -28,12 +28,15 @@ the label `mybuilds.brendanmanley.com/managed=true`:
 - **Stored once.** An event's delivery ID is the object's UID plus a hash of
   its snapshot. A resync, or the initial list after a restart, sees unchanged
   objects and stores nothing; the initial list also records anything that
-  changed while mybuilds was down.
+  changed while mybuilds was down. Each snapshot carries the object's
+  generation, so an object that changes and then changes back, such as a
+  ReplicaSet scaled to zero and up again, is not mistaken for one already
+  stored.
 
 | Event type | Workload key | Snapshot |
 | --- | --- | --- |
 | `k8s.deployment` | `namespace/name` | revision, generation and observed generation, desired, updated, ready and available replicas, Progressing and Available conditions |
-| `k8s.replicaset` | `namespace/<owning Deployment>` | revision, pod-template hash, creation time, replica counts |
+| `k8s.replicaset` | `namespace/<owning Deployment>` | revision, pod-template hash, creation time, generation, replica counts |
 | `k8s.pod` | `namespace/<Deployment of its ReplicaSet>` | pod-template hash, phase, Ready and its transition time, per container: image, `imageID` digest, restarts, state and reason |
 
 ## Attribution
@@ -64,6 +67,7 @@ Within the window, the new ReplicaSet is the one at the Deployment's
 | --- | --- |
 | succeeded | The Deployment's observed generation is current; desired, updated, available and total replicas are equal; and every Ready pod of the new ReplicaSet runs the release digest. Completion time is the Progressing condition's `NewReplicaSetAvailable` update time. |
 | failed | Progressing is `False` with `ProgressDeadlineExceeded`; a container of a new pod has restarted 3 times; or a Ready new pod runs another digest. |
+| succeeded, scaled to zero | The Deployment wants no replicas, its observed generation is current and no pods are left. There is no digest to check. A config release's summary then names no serving release. |
 | running | Evidence exists and neither of the above holds yet. |
 | unknown | The window closed with no evidence, or before the rollout finished. |
 

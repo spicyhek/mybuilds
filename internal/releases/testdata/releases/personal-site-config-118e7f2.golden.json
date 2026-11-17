@@ -1,0 +1,258 @@
+{
+  "release_id": "personal-site/config-118e7f2/production",
+  "events": 69,
+  "frames": [
+    "2026-11-16T01:23:44Z argocd.notification running | gitops_commit=succeeded(1) reconcile=running(2) rollout=pending verify=pending",
+    "2026-11-16T01:23:45Z argocd.notification running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=pending verify=pending",
+    "2026-11-16T01:23:45Z k8s.deployment running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running verify=pending",
+    "2026-11-16T01:23:45Z k8s.deployment running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(2) verify=pending",
+    "2026-11-16T01:23:45Z k8s.pod running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(3) verify=pending",
+    "2026-11-16T01:23:45Z k8s.deployment running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(3) verify=pending",
+    "2026-11-16T01:23:45Z k8s.replicaset running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(3) verify=pending",
+    "2026-11-16T01:23:45Z k8s.deployment running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(3) verify=pending",
+    "2026-11-16T01:23:45Z k8s.pod running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(3) verify=pending",
+    "2026-11-16T01:23:50Z k8s.pod running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(4) verify=pending",
+    "2026-11-16T01:23:50Z k8s.replicaset running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(4) verify=pending",
+    "2026-11-16T01:23:50Z k8s.deployment running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(4) verify=pending",
+    "2026-11-16T01:23:50Z k8s.replicaset running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(4) verify=pending",
+    "2026-11-16T01:23:51Z k8s.pod running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(5) verify=pending",
+    "2026-11-16T01:23:51Z k8s.replicaset running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(5) verify=pending",
+    "2026-11-16T01:23:51Z k8s.deployment running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(5) verify=pending",
+    "2026-11-16T01:23:51Z k8s.deployment running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(5) verify=pending",
+    "2026-11-16T01:23:51Z k8s.pod running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(5) verify=pending",
+    "2026-11-16T01:23:53Z k8s.pod running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(5) verify=pending",
+    "2026-11-16T01:23:53Z k8s.replicaset running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(5) verify=pending",
+    "2026-11-16T01:23:54Z k8s.deployment running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(5) verify=pending",
+    "2026-11-16T01:23:54Z k8s.replicaset running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(5) verify=pending",
+    "2026-11-16T01:23:54Z k8s.deployment running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(5) verify=pending",
+    "2026-11-16T01:23:54Z k8s.deployment running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(5) verify=pending",
+    "2026-11-16T01:23:54Z k8s.replicaset running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(5) verify=pending",
+    "2026-11-16T01:23:54Z k8s.pod running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(6) verify=pending",
+    "2026-11-16T01:23:54Z k8s.pod running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(6) verify=pending",
+    "2026-11-16T01:23:55Z k8s.pod running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(6) verify=pending",
+    "2026-11-16T01:23:55Z k8s.replicaset running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(6) verify=pending",
+    "2026-11-16T01:23:56Z k8s.deployment running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(6) verify=pending",
+    "2026-11-16T01:23:56Z k8s.deployment running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=succeeded(6) verify=pending",
+    "2026-11-16T01:23:59Z verifier.check running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=succeeded(6) verify=running(2)",
+    "2026-11-16T01:24:29Z verifier.check running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=succeeded(6) verify=running(3)",
+    "2026-11-16T01:25:04Z verifier.check running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=succeeded(6) verify=running(4)",
+    "2026-11-16T01:25:34Z verifier.check running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=succeeded(6) verify=running(5)",
+    "2026-11-16T01:26:09Z verifier.check succeeded | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=succeeded(6) verify=succeeded(6)"
+  ],
+  "frames_sha256": "19a568bf908633cc4ac1c2a57fcdc390bbd811cdd58b7a782be0023d43e4f2c1",
+  "release": {
+    "release_id": "personal-site/config-118e7f2/production",
+    "service": "personal-site",
+    "environment": "production",
+    "kind": "config",
+    "template": "config",
+    "drill": false,
+    "superseded": false,
+    "artifact": "ghcr.io/spicyhek/homelab-hosted-personal-site",
+    "artifact_digest": "sha256:c21ff4254cc82f4d27d0075b27dd5a3f3ce404e282b82090d8ae7162598f642a",
+    "gitops_repository": "spicyhek/homelab-infra",
+    "gitops_sha": "118e7f2a5fdafbbe51b1888dcdeec8e3b9435483",
+    "gitops_subject": "Test config change for personal site for mybuilds pipeline (#77)",
+    "gitops_author": "spicyhek \u003c59423225+spicyhek@users.noreply.github.com\u003e",
+    "runtime_release_id": "personal-site/c2cfca1/production/13",
+    "status": "succeeded",
+    "created_at": "2026-11-16T01:23:44Z",
+    "completed_at": "2026-11-16T01:26:09.218927379Z",
+    "verified_at": "2026-11-16T01:26:09.218927379Z",
+    "stages": [
+      {
+        "key": "gitops_commit",
+        "position": 1,
+        "state": "succeeded",
+        "attempt": 1,
+        "started_at": "2026-11-16T01:23:44Z",
+        "completed_at": "2026-11-16T01:23:44Z",
+        "summary": "Test config change for personal site for mybuilds pipeline (#77)",
+        "steps": [
+          {
+            "attempt": 1,
+            "position": 1,
+            "name": "Commit without a Release-Id trailer",
+            "state": "succeeded",
+            "started_at": "2026-11-16T01:23:44Z",
+            "completed_at": "2026-11-16T01:23:44Z",
+            "detail": "118e7f2 by spicyhek \u003c59423225+spicyhek@users.noreply.github.com\u003e",
+            "reconstructed": false
+          }
+        ]
+      },
+      {
+        "key": "reconcile",
+        "position": 2,
+        "state": "succeeded",
+        "attempt": 1,
+        "started_at": "2026-11-16T01:23:44Z",
+        "completed_at": "2026-11-16T01:23:45Z",
+        "summary": "Synced 118e7f2",
+        "steps": [
+          {
+            "attempt": 1,
+            "position": 1,
+            "name": "Revision detected",
+            "state": "succeeded",
+            "started_at": "2026-11-16T01:23:44Z",
+            "completed_at": "2026-11-16T01:23:44Z",
+            "detail": "personal-site at 118e7f2",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 2,
+            "name": "Sync",
+            "state": "succeeded",
+            "started_at": "2026-11-16T01:23:44Z",
+            "completed_at": "2026-11-16T01:23:45Z",
+            "detail": "Sync succeeded, health progressing",
+            "reconstructed": false
+          }
+        ]
+      },
+      {
+        "key": "rollout",
+        "position": 3,
+        "state": "succeeded",
+        "attempt": 1,
+        "started_at": "2026-11-16T01:23:45Z",
+        "completed_at": "2026-11-16T01:23:55Z",
+        "summary": "3/3 pods ready on sha256:c21ff4254cc8, serving personal-site/c2cfca1/production/13",
+        "steps": [
+          {
+            "attempt": 1,
+            "position": 1,
+            "name": "New ReplicaSet",
+            "state": "succeeded",
+            "started_at": "2026-11-16T01:23:45Z",
+            "completed_at": "2026-11-16T01:23:45Z",
+            "detail": "personal-site-c79b8c946, revision 37",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 2,
+            "name": "Pod personal-site-c79b8c946-hkgpb",
+            "state": "succeeded",
+            "started_at": "2026-11-16T01:23:45Z",
+            "completed_at": "2026-11-16T01:23:50Z",
+            "detail": "Ready on sha256:c21ff4254cc8, 0 restarts",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 3,
+            "name": "Pod personal-site-c79b8c946-r67kb",
+            "state": "succeeded",
+            "started_at": "2026-11-16T01:23:50Z",
+            "completed_at": "2026-11-16T01:23:53Z",
+            "detail": "Ready on sha256:c21ff4254cc8, 0 restarts",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 4,
+            "name": "Pod personal-site-c79b8c946-4b28t",
+            "state": "succeeded",
+            "started_at": "2026-11-16T01:23:54Z",
+            "completed_at": "2026-11-16T01:23:55Z",
+            "detail": "Ready on sha256:c21ff4254cc8, 0 restarts",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 5,
+            "name": "Old pods scaled down",
+            "state": "succeeded",
+            "started_at": "2026-11-16T01:23:45Z",
+            "completed_at": "2026-11-16T01:23:45.369764386Z",
+            "detail": "No old pods remain",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 6,
+            "name": "Digest check",
+            "state": "succeeded",
+            "completed_at": "2026-11-16T01:23:55Z",
+            "detail": "3 ready pods on sha256:c21ff4254cc8",
+            "reconstructed": false
+          }
+        ]
+      },
+      {
+        "key": "verify",
+        "position": 4,
+        "state": "succeeded",
+        "attempt": 1,
+        "started_at": "2026-11-16T01:23:59.120022931Z",
+        "completed_at": "2026-11-16T01:26:09.218927379Z",
+        "summary": "5 consecutive checks passed, slowest 314 ms",
+        "steps": [
+          {
+            "attempt": 1,
+            "position": 1,
+            "name": "DNS + TLS",
+            "state": "succeeded",
+            "started_at": "2026-11-16T01:23:59.120022931Z",
+            "completed_at": "2026-11-16T01:23:59.120022931Z",
+            "detail": "TLS 1.3, certificate valid until 2027-01-16",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 2,
+            "name": "Check 1",
+            "state": "succeeded",
+            "started_at": "2026-11-16T01:23:59.120022931Z",
+            "completed_at": "2026-11-16T01:23:59.434022931Z",
+            "detail": "HTTP 200 in 314 ms, personal-site/c2cfca1/production/13, SJC, 1 of 5 in a row",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 3,
+            "name": "Check 2",
+            "state": "succeeded",
+            "started_at": "2026-11-16T01:24:29.120411989Z",
+            "completed_at": "2026-11-16T01:24:29.219411989Z",
+            "detail": "HTTP 200 in 99 ms, personal-site/c2cfca1/production/13, SJC, 2 of 5 in a row",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 4,
+            "name": "Check 3",
+            "state": "succeeded",
+            "started_at": "2026-11-16T01:25:04.123919745Z",
+            "completed_at": "2026-11-16T01:25:04.254919745Z",
+            "detail": "HTTP 200 in 131 ms, personal-site/c2cfca1/production/13, SJC, 3 of 5 in a row",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 5,
+            "name": "Check 4",
+            "state": "succeeded",
+            "started_at": "2026-11-16T01:25:34.124633536Z",
+            "completed_at": "2026-11-16T01:25:34.225633536Z",
+            "detail": "HTTP 200 in 101 ms, personal-site/c2cfca1/production/13, SJC, 4 of 5 in a row",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 6,
+            "name": "Check 5",
+            "state": "succeeded",
+            "started_at": "2026-11-16T01:26:09.121927379Z",
+            "completed_at": "2026-11-16T01:26:09.218927379Z",
+            "detail": "HTTP 200 in 97 ms, personal-site/c2cfca1/production/13, SJC, 5 of 5 in a row",
+            "reconstructed": false
+          }
+        ]
+      }
+    ]
+  }
+}

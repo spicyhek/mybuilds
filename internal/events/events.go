@@ -240,20 +240,24 @@ type Condition struct {
 
 // ReplicaSet is a snapshot of a ReplicaSet owned by a managed Deployment.
 type ReplicaSet struct {
-	Namespace         string    `json:"namespace"`
-	Name              string    `json:"name"`
-	UID               string    `json:"uid"`
-	Deployment        string    `json:"deployment"`
-	Revision          string    `json:"revision,omitempty"`
-	PodTemplateHash   string    `json:"pod_template_hash,omitempty"`
-	CreatedAt         time.Time `json:"created_at"`
-	Replicas          int32     `json:"replicas"`
-	StatusReplicas    int32     `json:"status_replicas"`
-	ReadyReplicas     int32     `json:"ready_replicas"`
-	AvailableReplicas int32     `json:"available_replicas"`
-	Images            []string  `json:"images,omitempty"`
-	ReleaseID         string    `json:"release_id,omitempty"`
-	Deleted           bool      `json:"deleted,omitempty"`
+	Namespace       string    `json:"namespace"`
+	Name            string    `json:"name"`
+	UID             string    `json:"uid"`
+	Deployment      string    `json:"deployment"`
+	Revision        string    `json:"revision,omitempty"`
+	PodTemplateHash string    `json:"pod_template_hash,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	// Generation counts spec changes, such as a scale. Without it, a
+	// ReplicaSet scaled down and back up looks exactly as it did before and
+	// its snapshot would be dropped as a duplicate.
+	Generation        int64    `json:"generation,omitempty"`
+	Replicas          int32    `json:"replicas"`
+	StatusReplicas    int32    `json:"status_replicas"`
+	ReadyReplicas     int32    `json:"ready_replicas"`
+	AvailableReplicas int32    `json:"available_replicas"`
+	Images            []string `json:"images,omitempty"`
+	ReleaseID         string   `json:"release_id,omitempty"`
+	Deleted           bool     `json:"deleted,omitempty"`
 }
 
 // Pod is a snapshot of a pod of a managed Deployment.
