@@ -33,7 +33,15 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		}
 	}
 
+	// Every transaction here writes, so each begins IMMEDIATE and takes the
+	// write lock up front, waiting up to busy_timeout for it. A deferred
+	// transaction would start on a read snapshot and fail at its first write
+	// with SQLITE_BUSY_SNAPSHOT (517) if another connection committed in
+	// between; the busy handler never runs for that, so the ingester, the
+	// runtime watch and the verifier lost projections when they wrote at
+	// once (seen draining the queue after an outage).
 	dsn := "file:" + filepath.ToSlash(path) + "?" + strings.Join([]string{
+		"_txlock=immediate",
 		"_pragma=busy_timeout(5000)",
 		"_pragma=journal_mode(WAL)",
 		"_pragma=synchronous(NORMAL)",
@@ -45,7 +53,8 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 	// One process is the only writer. A few connections let readers run
-	// alongside a write; busy_timeout covers write contention between them.
+	// alongside a write; busy_timeout covers write contention between the
+	// connections that write.
 	db.SetMaxOpenConns(4)
 
 	if err := db.PingContext(ctx); err != nil {
