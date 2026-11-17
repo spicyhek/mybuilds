@@ -21,9 +21,34 @@ jobs:
     permissions:
       contents: read
 
+    outputs:
+      app: ${{ steps.changes.outputs.app }}
+      worker: ${{ steps.changes.outputs.worker }}
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      # A push that only touches worker/ deploys the Worker and not the app,
+      # and the other way round (plan section 8.8). Pull requests test both.
+      - name: Detect what changed
+        id: changes
+        run: |
+          set -euo pipefail
+          app=true
+          worker=true
+          if [ "${GITHUB_EVENT_NAME}" = "push" ] && git rev-parse -q --verify 'HEAD^' > /dev/null; then
+            files="$(git diff --name-only 'HEAD^' HEAD)"
+            app=false
+            worker=false
+            if grep -qv '^worker/' <<< "${files}"; then app=true; fi
+            if grep -q '^worker/' <<< "${files}"; then worker=true; fi
+          fi
+          echo "app=${app}" >> "$GITHUB_OUTPUT"
+          echo "worker=${worker}" >> "$GITHUB_OUTPUT"
+          echo "app=${app} worker=${worker}"
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -61,11 +86,18 @@ jobs:
       - name: Test
         run: go test -race -count=1 ./...
 
+      - name: Test Worker
+        working-directory: worker
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm test
+
   # The job and step names below are what the mybuilds service map expects
   # (plan section 8.1): build, then bump-gitops.
   build:
     needs: test
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && needs.test.outputs.app == 'true'
     runs-on: ubuntu-latest
 
     permissions:
@@ -171,6 +203,33 @@ jobs:
             echo "Image: \`${IMAGE_NAME}@${DIGEST}\`"
           } >> "${GITHUB_STEP_SUMMARY}"
 
+      # mybuilds tracks its own releases (plan section 8.8). The running
+      # version receives these; a release that replaces it is seen through
+      # to the end by the new pod.
+      - name: Report release to mybuilds
+        env:
+          MYBUILDS_CI_EVENT_SECRET: ${{ secrets.MYBUILDS_CI_EVENT_SECRET }}
+          RELEASE_ID: ${{ steps.release.outputs.id }}
+          DIGEST: ${{ steps.digest.outputs.digest }}
+        run: |
+          jq -cn \
+            --arg release_id "${RELEASE_ID}" \
+            --arg repository "${GITHUB_REPOSITORY}" \
+            --arg sha "${GITHUB_SHA}" \
+            --arg artifact "${IMAGE_NAME}" \
+            --arg digest "${DIGEST}" \
+            --argjson run_id "${GITHUB_RUN_ID}" \
+            --argjson run_number "${GITHUB_RUN_NUMBER}" \
+            --argjson attempt "${GITHUB_RUN_ATTEMPT}" \
+            --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{type: "release.published", release_id: $release_id,
+              service: "mybuilds", environment: "production",
+              source_repository: $repository, source_sha: $sha,
+              artifact: $artifact, artifact_digest: $digest,
+              workflow_run_id: $run_id, workflow_run_number: $run_number,
+              run_attempt: $attempt, drill: false, occurred_at: $now}' |
+            bash .github/scripts/mybuilds-event.sh
+
   # Promotes the image by pinning its digest in homelab-infra, the same way
   # personal-site does: a pull request that is squash-merged at once, with a
   # Release-Id trailer, and Argo CD syncs it. homelab-infra main requires a
@@ -213,6 +272,25 @@ jobs:
           else
             echo "superseded=false" >> "$GITHUB_OUTPUT"
           fi
+          echo "latest_sha=${LATEST_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Report superseded release to mybuilds
+        if: steps.latest.outputs.superseded == 'true'
+        env:
+          MYBUILDS_CI_EVENT_SECRET: ${{ secrets.MYBUILDS_CI_EVENT_SECRET }}
+          SUPERSEDED_BY: ${{ steps.latest.outputs.latest_sha }}
+        run: |
+          jq -cn \
+            --arg release_id "${RELEASE_ID}" \
+            --arg superseded_by "${SUPERSEDED_BY}" \
+            --argjson run_id "${GITHUB_RUN_ID}" \
+            --argjson attempt "${GITHUB_RUN_ATTEMPT}" \
+            --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{type: "gitops.superseded", release_id: $release_id,
+              service: "mybuilds", environment: "production",
+              superseded_by: $superseded_by,
+              workflow_run_id: $run_id, run_attempt: $attempt, occurred_at: $now}' |
+            bash .github/scripts/mybuilds-event.sh
 
       # Until the manifests are merged there is nothing to promote, and the
       # token is not needed yet. homelab-infra is public, so this check
@@ -357,3 +435,60 @@ jobs:
             echo "Digest: \`${DIGEST}\`"
             echo "GitOps commit: \`${INFRA_REPOSITORY}@${GITOPS_SHA}\`"
           } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Report GitOps update to mybuilds
+        if: steps.merge.outputs.gitops_sha != ''
+        env:
+          MYBUILDS_CI_EVENT_SECRET: ${{ secrets.MYBUILDS_CI_EVENT_SECRET }}
+          GITOPS_SHA: ${{ steps.merge.outputs.gitops_sha }}
+        run: |
+          jq -cn \
+            --arg release_id "${RELEASE_ID}" \
+            --arg gitops_sha "${GITOPS_SHA}" \
+            --arg gitops_repository "${INFRA_REPOSITORY}" \
+            --argjson run_id "${GITHUB_RUN_ID}" \
+            --argjson attempt "${GITHUB_RUN_ATTEMPT}" \
+            --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{type: "gitops.updated", release_id: $release_id,
+              service: "mybuilds", environment: "production",
+              gitops_repository: $gitops_repository, gitops_sha: $gitops_sha,
+              workflow_run_id: $run_id, run_attempt: $attempt, occurred_at: $now}' |
+            bash .github/scripts/mybuilds-event.sh
+
+  # The ingestion buffer's receiver (docs/buffer.md). CLOUDFLARE_API_TOKEN
+  # is a token with Workers Scripts and Workers Routes edit on the account
+  # and zone; CLOUDFLARE_ACCOUNT_ID the account. The Worker's own secrets
+  # are set once by hand (worker/wrangler.toml).
+  deploy-worker:
+    needs: test
+    if: github.event_name == 'push' && needs.test.outputs.worker == 'true'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+
+      - name: Deploy Worker
+        working-directory: worker
+        run: |
+          set -euo pipefail
+          if [ -z "${CLOUDFLARE_API_TOKEN}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is not set; the Worker was not deployed"
+            exit 0
+          fi
+          npm ci --no-audit --no-fund
+          npx wrangler deploy

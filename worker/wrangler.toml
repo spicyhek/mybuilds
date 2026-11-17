@@ -1,0 +1,26 @@
+# The ingestion buffer's receiver (docs/buffer.md). Deployed by the release
+# workflow's deploy-worker job when worker/ changes.
+name = "mybuilds-ingest"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = false
+
+# Only the ingestion paths. Everything else on the hostname goes through the
+# Cloudflare Tunnel to mybuilds as before.
+routes = [
+  { pattern = "mybuilds.brendanmanley.com/hooks/*", zone_name = "brendanmanley.com" },
+  { pattern = "mybuilds.brendanmanley.com/api/v1/ci-events", zone_name = "brendanmanley.com" },
+]
+
+[vars]
+SQS_QUEUE_URL = "https://sqs.us-west-1.amazonaws.com/062700375181/mybuilds-ingest"
+AWS_REGION = "us-west-1"
+
+# Secrets, set with `wrangler secret put`: AWS_ACCESS_KEY_ID and
+# AWS_SECRET_ACCESS_KEY of the mybuilds-ingest-worker IAM user, and
+# MYBUILDS_GITHUB_WEBHOOK_SECRET, MYBUILDS_CI_EVENT_SECRET and
+# MYBUILDS_ARGOCD_TOKEN, the same values as the cluster's mybuilds-ingest
+# Secret.
+
+[observability]
+enabled = true

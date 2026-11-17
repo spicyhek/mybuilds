@@ -2,6 +2,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -35,6 +36,13 @@ type Config struct {
 	// Verifier is "auto", which runs the public checks unless in fixture
 	// mode, or "off".
 	Verifier string
+	// SQSQueueURL enables the off-cluster ingestion buffer's consumer
+	// (docs/buffer.md). The region is read from the URL unless SQSRegion
+	// is set.
+	SQSQueueURL        string
+	SQSRegion          string
+	SQSAccessKeyID     string
+	SQSSecretAccessKey string
 }
 
 // String hides the secrets, so a logged Config never leaks them.
@@ -64,12 +72,19 @@ func FromEnv() (Config, error) {
 		ArgoCDToken:         os.Getenv("MYBUILDS_ARGOCD_TOKEN"),
 		RuntimeWatch:        envOr("MYBUILDS_RUNTIME_WATCH", "auto"),
 		Verifier:            envOr("MYBUILDS_VERIFIER", "auto"),
+		SQSQueueURL:         os.Getenv("MYBUILDS_SQS_QUEUE_URL"),
+		SQSRegion:           os.Getenv("MYBUILDS_SQS_REGION"),
+		SQSAccessKeyID:      os.Getenv("MYBUILDS_SQS_ACCESS_KEY_ID"),
+		SQSSecretAccessKey:  os.Getenv("MYBUILDS_SQS_SECRET_ACCESS_KEY"),
 	}
 	if cfg.Verifier != "auto" && cfg.Verifier != "off" {
 		return cfg, fmt.Errorf("MYBUILDS_VERIFIER: %q is not auto or off", cfg.Verifier)
 	}
 	if cfg.RuntimeWatch != "auto" && cfg.RuntimeWatch != "off" {
 		return cfg, fmt.Errorf("MYBUILDS_RUNTIME_WATCH: %q is not auto or off", cfg.RuntimeWatch)
+	}
+	if cfg.SQSQueueURL != "" && (cfg.SQSAccessKeyID == "" || cfg.SQSSecretAccessKey == "") {
+		return cfg, errors.New("MYBUILDS_SQS_QUEUE_URL needs MYBUILDS_SQS_ACCESS_KEY_ID and MYBUILDS_SQS_SECRET_ACCESS_KEY")
 	}
 
 	fixtures, err := envBool("MYBUILDS_FIXTURES", false)
