@@ -184,6 +184,8 @@ func newHarness(t *testing.T) *harness {
 		synced:   prometheus.NewGauge(prometheus.GaugeOpts{Name: "y"}),
 	}
 	h.w.opts.Logger = discardLogger()
+	// Registered after the store's Close, so it runs before it.
+	t.Cleanup(h.everyReleaseSelfContained)
 	return h
 }
 

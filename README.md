@@ -22,6 +22,7 @@ from.
 
 ```text
 cmd/server             entry point: two listeners, graceful shutdown
+cmd/record-release     saves a release's events from a running mybuilds as a test fixture
 internal/config        MYBUILDS_* environment variables
 internal/storage       SQLite (WAL), versioned migrations, release queries
 internal/events        normalized event types
@@ -141,6 +142,7 @@ serves production, screenshots and the CI smoke test.
 | `GET /api/v1/releases` | Newest releases first, with stages. Query: `limit` (1–200, default 50), `service`, `kind` (`application`, `config`), `outcome` (a release state; `skipped` includes superseded releases), `drill` (`true` keeps only drills, `false` hides them) and `cursor`. `next_cursor` continues the list and is null on the last page |
 | `GET /api/v1/releases/{release_id}` | One release with each stage's steps. IDs contain slashes, e.g. `personal-site/ce61154/production/11` |
 | `GET /api/v1/releases/{release_id}/timeline` | Every state the release passed through, projected from its events in order, for replay. See [`docs/replay.md`](docs/replay.md) |
+| `GET /api/v1/releases/{release_id}/events` | Every normalized event the release's projection reads, in ID order, for recording it as a test fixture. See [`docs/replay.md`](docs/replay.md) |
 | `GET /api/v1/stream` | Server-Sent Events: `hello`, then `release.created` and `release.updated` with the full release view. The SSE `id` is the event ID; a reconnect with `Last-Event-ID` replays what was missed, or sends `snapshot` when the cursor is too old |
 | `GET /api/v1/meta` | Version, release ID, fixture mode and the public parts of the service map |
 | `POST /hooks/github` | GitHub `workflow_run` and `workflow_job` webhooks |
@@ -178,6 +180,12 @@ go test ./...
 `internal/ingest` replays the real `personal-site` release #11 from recorded
 deliveries: in live order, again as duplicates, and reversed and shuffled,
 and checks that the release is the same each time.
+
+`internal/releases` replays every recorded release in
+`internal/releases/testdata/releases/` and checks it against a stored
+snapshot of the release and its timeline. Recording one, and updating the
+snapshots after an intended projector change, is described in
+[docs/replay.md](docs/replay.md), "Recorded releases as fixtures".
 
 CI (`.github/workflows/release.yml`) builds the frontend (which type-checks
 it), then runs `gofmt`, `go vet` and the tests on every pull request. On `main` it also builds the image, runs a smoke test
