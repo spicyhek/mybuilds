@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spicyhek/mybuilds/internal/events"
 	"github.com/spicyhek/mybuilds/internal/releases"
 	"github.com/spicyhek/mybuilds/internal/storage"
 )
@@ -231,10 +232,14 @@ func decodeCursor(v string) (storage.ReleaseCursor, error) {
 
 func (s *server) getRelease(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	// No release ID ends in /timeline: its last part is a run number or an
-	// environment.
+	// No release ID ends in /timeline or /events: its last part is a run
+	// number or an environment.
 	if base, ok := strings.CutSuffix(id, "/timeline"); ok {
 		s.timeline(w, r, base)
+		return
+	}
+	if base, ok := strings.CutSuffix(id, "/events"); ok {
+		s.releaseEvents(w, r, base)
 		return
 	}
 	if id == "" {
@@ -292,6 +297,48 @@ func (s *server) timeline(w http.ResponseWriter, r *http.Request, id string) {
 	resp := timelineResponse{ReleaseID: id, Frames: make([]frameView, 0, len(frames))}
 	for _, f := range frames {
 		resp.Frames = append(resp.Frames, frameView{At: f.At, EventType: f.EventType, Release: toView(f.Release)})
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+type eventsResponse struct {
+	ReleaseID string          `json:"release_id"`
+	Events    []events.Record `json:"events"`
+}
+
+// releaseEvents serves GET /api/v1/releases/{id}/events: every event the
+// release's projection reads, so it can be recorded as a test fixture (plan
+// section 7.5). Payloads are the normalized, allowlisted ones ingestion
+// stored, re-encoded through their types; raw provider bodies are never
+// stored, so they cannot be returned.
+func (s *server) releaseEvents(w http.ResponseWriter, r *http.Request, id string) {
+	if s.projector == nil {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	if _, err := s.store.GetRelease(r.Context(), id); errors.Is(err, storage.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "release not found")
+		return
+	} else if err != nil {
+		s.logger.Error("get release", "release_id", id, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	evs, err := s.projector.RecordedEvents(r.Context(), id)
+	if err != nil {
+		s.logger.Error("release events", "release_id", id, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	resp := eventsResponse{ReleaseID: id, Events: make([]events.Record, 0, len(evs))}
+	for _, e := range evs {
+		rec, err := events.NewRecord(e)
+		if err != nil {
+			s.logger.Error("release events", "release_id", id, "error", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		resp.Events = append(resp.Events, rec)
 	}
 	writeJSON(w, http.StatusOK, resp)
 }
