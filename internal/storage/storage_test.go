@@ -3,7 +3,9 @@ package storage
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -159,5 +161,44 @@ func TestInsertReleaseRejectsBadKind(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("insert with unknown kind succeeded, want CHECK constraint error")
+	}
+}
+
+// TestConcurrentProjectionsDoNotFail reproduces the drain after an outage:
+// several goroutines write projections at once, as the ingester, the runtime
+// watch and the verifier do. SaveProjection reads before it writes, so with
+// deferred transactions this fails with SQLITE_BUSY_SNAPSHOT.
+func TestConcurrentProjectionsDoNotFail(t *testing.T) {
+	ctx := context.Background()
+	store := openTestStore(t)
+
+	const writers, rounds = 4, 25
+	errs := make(chan error, writers*rounds)
+	var wg sync.WaitGroup
+	for w := 0; w < writers; w++ {
+		wg.Add(1)
+		go func(w int) {
+			defer wg.Done()
+			for i := 0; i < rounds; i++ {
+				rel := releases.Release{
+					ReleaseID:   fmt.Sprintf("personal-site/%07x/production/%d", w, i),
+					Service:     "personal-site",
+					Environment: "production",
+					Kind:        releases.KindApplication,
+					Template:    releases.TemplateApplication,
+					Status:      releases.StateRunning,
+					CreatedAt:   time.Date(2026, 11, 17, 5, 55, 0, 0, time.UTC),
+					Stages:      []releases.Stage{{Key: "source", State: releases.StateSucceeded}},
+				}
+				if _, err := store.SaveProjection(ctx, releases.Projection{Release: rel}); err != nil {
+					errs <- err
+				}
+			}
+		}(w)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Errorf("concurrent SaveProjection: %v", err)
 	}
 }
