@@ -75,6 +75,7 @@ func ReplicaSetEvent(rs *appsv1.ReplicaSet, deleted bool, now time.Time) (*event
 		Revision:          rs.Annotations[revisionAnnotation],
 		PodTemplateHash:   rs.Labels[podTemplateHash],
 		CreatedAt:         rs.CreationTimestamp.UTC(),
+		Generation:        rs.Generation,
 		Replicas:          replicas(rs.Spec.Replicas),
 		StatusReplicas:    rs.Status.Replicas,
 		ReadyReplicas:     rs.Status.ReadyReplicas,

@@ -263,6 +263,14 @@ func (v *rolloutView) evaluate(digest, artifact string, at time.Time) rolloutRes
 		return res
 	}
 
+	// A Deployment scaled to zero has finished once no pods are left: with
+	// nothing to run, its digest cannot be checked.
+	if dep != nil && !dep.Deleted && dep.Replicas == 0 && dep.ObservedGeneration >= dep.Generation &&
+		dep.StatusReplicas == 0 && dep.UpdatedReplicas == 0 && dep.AvailableReplicas == 0 && res.ready == 0 {
+		res.state = StateSucceeded
+		res.completed = timePtr(at)
+		return res
+	}
 	if dep != nil && !dep.Deleted && dep.Replicas > 0 && digest != "" &&
 		dep.ObservedGeneration >= dep.Generation &&
 		dep.UpdatedReplicas == dep.Replicas &&
@@ -279,6 +287,9 @@ func (v *rolloutView) evaluate(digest, artifact string, at time.Time) rolloutRes
 	}
 	return res
 }
+
+// scaledToZero is the Rollout summary of a Deployment scaled to zero.
+const scaledToZero = "Scaled to zero, no pods running"
 
 // rollout projects the Rollout stage from the release's runtime window. The
 // first terminal outcome is final: later events in the window, such as a
@@ -341,6 +352,9 @@ func (f *fold) rollout(st *Stage, r Release, rt *Runtime) []Step {
 	case StateSucceeded:
 		st.CompletedAt = latest(res.completed, st.StartedAt)
 		st.Summary = fmt.Sprintf("%d/%d pods ready on %s", res.ready, v.dep.Replicas, short(res.digest, 19))
+		if v.dep.Replicas == 0 {
+			st.Summary = scaledToZero
+		}
 	case StateFailed:
 		st.CompletedAt = latest(res.completed, st.StartedAt)
 		st.FailureReason = res.reason

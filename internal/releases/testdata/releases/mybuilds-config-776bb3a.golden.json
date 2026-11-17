@@ -1,0 +1,94 @@
+{
+  "release_id": "mybuilds/config-776bb3a/production",
+  "events": 9,
+  "frames": [
+    "2026-11-17T05:55:47Z argocd.notification running | gitops_commit=succeeded(1) reconcile=running(2) rollout=pending verify=pending",
+    "2026-11-17T05:55:48Z argocd.notification running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=pending verify=pending",
+    "2026-11-17T05:55:53Z k8s.deployment running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running verify=pending",
+    "2026-11-17T06:33:35Z argocd.notification unknown | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=unknown verify=pending"
+  ],
+  "frames_sha256": "be41282b8eab08f5ed8840ad51d4a4d023ab605c9b728c2e6cd394c37840aa33",
+  "release": {
+    "release_id": "mybuilds/config-776bb3a/production",
+    "service": "mybuilds",
+    "environment": "production",
+    "kind": "config",
+    "template": "config",
+    "drill": false,
+    "superseded": false,
+    "gitops_repository": "spicyhek/homelab-infra",
+    "gitops_sha": "776bb3a7a7b1984fc7c3907574408a22756977a9",
+    "gitops_subject": "Scale mybuilds back to 1 (#85)",
+    "gitops_author": "spicyhek \u003c59423225+spicyhek@users.noreply.github.com\u003e",
+    "status": "unknown",
+    "created_at": "2026-11-17T05:55:47Z",
+    "stages": [
+      {
+        "key": "gitops_commit",
+        "position": 1,
+        "state": "succeeded",
+        "attempt": 1,
+        "started_at": "2026-11-17T05:55:47Z",
+        "completed_at": "2026-11-17T05:55:47Z",
+        "summary": "Scale mybuilds back to 1 (#85)",
+        "steps": [
+          {
+            "attempt": 1,
+            "position": 1,
+            "name": "Commit without a Release-Id trailer",
+            "state": "succeeded",
+            "started_at": "2026-11-17T05:55:47Z",
+            "completed_at": "2026-11-17T05:55:47Z",
+            "detail": "776bb3a by spicyhek \u003c59423225+spicyhek@users.noreply.github.com\u003e",
+            "reconstructed": false
+          }
+        ]
+      },
+      {
+        "key": "reconcile",
+        "position": 2,
+        "state": "succeeded",
+        "attempt": 1,
+        "started_at": "2026-11-17T05:55:47Z",
+        "completed_at": "2026-11-17T05:55:48Z",
+        "summary": "Synced 776bb3a",
+        "steps": [
+          {
+            "attempt": 1,
+            "position": 1,
+            "name": "Revision detected",
+            "state": "succeeded",
+            "started_at": "2026-11-17T05:55:47Z",
+            "completed_at": "2026-11-17T05:55:47Z",
+            "detail": "mybuilds at 776bb3a",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 2,
+            "name": "Sync",
+            "state": "succeeded",
+            "started_at": "2026-11-17T05:55:47Z",
+            "completed_at": "2026-11-17T05:55:48Z",
+            "detail": "Sync succeeded, health progressing",
+            "reconstructed": false
+          }
+        ]
+      },
+      {
+        "key": "rollout",
+        "position": 3,
+        "state": "unknown",
+        "attempt": 1,
+        "started_at": "2026-11-17T05:55:53.058731515Z",
+        "failure_reason": "A newer sync started before this rollout finished"
+      },
+      {
+        "key": "verify",
+        "position": 4,
+        "state": "pending",
+        "attempt": 1
+      }
+    ]
+  }
+}

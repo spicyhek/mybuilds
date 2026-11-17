@@ -55,7 +55,8 @@ func (f *fold) resultConfig(shortSHA string) Projection {
 
 	rsteps, samples := f.runtimeStages(&r, stages)
 	steps = append(steps, rsteps...)
-	if rs := stages["rollout"]; rs.State == StateSucceeded && r.RuntimeReleaseID != "" {
+	// Pods scaled to zero serve nothing.
+	if rs := stages["rollout"]; rs.State == StateSucceeded && r.RuntimeReleaseID != "" && rs.Summary != scaledToZero {
 		rs.Summary += fmt.Sprintf(", serving %s", r.RuntimeReleaseID)
 	}
 

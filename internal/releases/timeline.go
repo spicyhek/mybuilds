@@ -42,6 +42,13 @@ func (p *Projector) Timeline(ctx context.Context, releaseID string) ([]Frame, er
 		sortEvents(rt.Events)
 		in.runtime = &rt
 		all = append(all, rt.Events...)
+		// The next sync closes the window, which can change the release,
+		// as a rollout cut off there becomes unknown. That sync is not one
+		// of the release's events, so it gets a frame of its own and the
+		// last frame still equals the stored release.
+		if rt.End != nil {
+			all = append(all, events.Event{Type: events.TypeArgoCD, OccurredAt: *rt.End})
+		}
 	}
 	sortEvents(all)
 	evs := append([]events.Event(nil), in.events...)
