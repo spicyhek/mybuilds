@@ -137,6 +137,10 @@ type rolloutResult struct {
 	// digest is the one the pods must run: the release's, or for a config
 	// release, the new ReplicaSet's template image.
 	digest string
+	// fromPods is set when the template names the image by tag, so the
+	// digest is the one the first Ready new pod runs and the others must
+	// agree with it.
+	fromPods bool
 }
 
 func (v *rolloutView) apply(e events.Event) (bool, error) {
@@ -216,6 +220,21 @@ func (v *rolloutView) evaluate(digest, artifact string, at time.Time) rolloutRes
 		if digest == "" {
 			digest = templateDigest(res.newRS.rs.Images, artifact)
 		}
+		// A template that names the image by tag, as before a service's
+		// first digest-pinned release, has no digest to expect. Then the
+		// Ready pods define it and must all run the same one.
+		if digest == "" {
+			for _, obs := range res.newPods {
+				if obs.pod.Deleted || !obs.pod.Ready {
+					continue
+				}
+				for _, c := range releaseContainers(obs.pod, artifact) {
+					if digest == "" && c.ImageDigest != "" {
+						digest, res.fromPods = c.ImageDigest, true
+					}
+				}
+			}
+		}
 	}
 	res.digest = digest
 
@@ -259,6 +278,9 @@ func (v *rolloutView) evaluate(digest, artifact string, at time.Time) rolloutRes
 	if res.mismatch != "" {
 		res.state = StateFailed
 		res.reason = "Pod " + res.mismatch + ", not the release digest"
+		if res.fromPods {
+			res.reason = "Pod " + res.mismatch + ", not " + short(digest, 19) + " like the first ready pod of the same tag"
+		}
 		res.completed = timePtr(at)
 		return res
 	}
@@ -422,6 +444,9 @@ func rolloutSteps(v *rolloutView, res rolloutResult, digest, artifact string, ol
 		} else {
 			check.State = StateSucceeded
 			check.Detail = fmt.Sprintf("%d ready pods on %s", res.ready, short(digest, 19))
+			if res.fromPods {
+				check.Detail += ", read from the pods: the template names the image by tag"
+			}
 			if res.state != StateSucceeded {
 				check.State = StateRunning
 			}
