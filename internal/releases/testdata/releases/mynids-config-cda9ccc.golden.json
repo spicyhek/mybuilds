@@ -1,0 +1,152 @@
+{
+  "release_id": "mynids/config-cda9ccc/production",
+  "events": 17,
+  "frames": [
+    "2026-11-18T00:41:08Z argocd.notification running | gitops_commit=succeeded(1) reconcile=running(2) rollout=pending verify=pending",
+    "2026-11-18T00:41:09Z argocd.notification running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=pending verify=pending",
+    "2026-11-18T00:41:09Z k8s.deployment running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running verify=pending",
+    "2026-11-18T00:41:09Z k8s.deployment running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(2) verify=pending",
+    "2026-11-18T00:41:09Z k8s.pod running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(3) verify=pending",
+    "2026-11-18T00:41:09Z k8s.deployment running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(3) verify=pending",
+    "2026-11-18T00:41:10Z k8s.replicaset running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(3) verify=pending",
+    "2026-11-18T00:41:10Z k8s.deployment running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(3) verify=pending",
+    "2026-11-18T00:41:10Z k8s.pod running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(3) verify=pending",
+    "2026-11-18T00:41:13Z k8s.pod running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(3) verify=pending",
+    "2026-11-18T00:41:30Z k8s.pod running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(4) verify=pending",
+    "2026-11-18T00:41:31Z k8s.replicaset running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(4) verify=pending",
+    "2026-11-18T00:41:31Z k8s.deployment running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(4) verify=pending",
+    "2026-11-18T00:41:35Z k8s.replicaset running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(4) verify=pending",
+    "2026-11-18T00:41:35Z k8s.deployment running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(4) verify=pending",
+    "2026-11-18T00:41:35Z k8s.deployment succeeded | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=succeeded(4) verify=skipped"
+  ],
+  "frames_sha256": "38f669d59f1421eccfc958d0c8000f28e1db67b7bae07c0066dba3dbc1036b34",
+  "release": {
+    "release_id": "mynids/config-cda9ccc/production",
+    "service": "mynids",
+    "environment": "production",
+    "kind": "config",
+    "template": "config",
+    "drill": false,
+    "superseded": false,
+    "artifact": "ghcr.io/spicyhek/mynids",
+    "artifact_digest": "sha256:b473b607cdc6fb68d5b306fb898db0b76b6bac13819bfadd593d96779191e10e",
+    "gitops_repository": "spicyhek/homelab-infra",
+    "gitops_sha": "cda9ccc0b4ccf541df659a0bf928f29c16785f6e",
+    "gitops_subject": "Add mybuilds label for mynids, argocd notifications for mynids (#91)",
+    "gitops_author": "spicyhek \u003c59423225+spicyhek@users.noreply.github.com\u003e",
+    "status": "succeeded",
+    "created_at": "2026-11-18T00:41:08Z",
+    "completed_at": "2026-11-18T00:41:35Z",
+    "stages": [
+      {
+        "key": "gitops_commit",
+        "position": 1,
+        "state": "succeeded",
+        "attempt": 1,
+        "started_at": "2026-11-18T00:41:08Z",
+        "completed_at": "2026-11-18T00:41:08Z",
+        "summary": "Add mybuilds label for mynids, argocd notifications for mynids (#91)",
+        "steps": [
+          {
+            "attempt": 1,
+            "position": 1,
+            "name": "Commit without a Release-Id trailer",
+            "state": "succeeded",
+            "started_at": "2026-11-18T00:41:08Z",
+            "completed_at": "2026-11-18T00:41:08Z",
+            "detail": "cda9ccc by spicyhek \u003c59423225+spicyhek@users.noreply.github.com\u003e",
+            "reconstructed": false
+          }
+        ]
+      },
+      {
+        "key": "reconcile",
+        "position": 2,
+        "state": "succeeded",
+        "attempt": 1,
+        "started_at": "2026-11-18T00:41:08Z",
+        "completed_at": "2026-11-18T00:41:09Z",
+        "summary": "Synced cda9ccc",
+        "steps": [
+          {
+            "attempt": 1,
+            "position": 1,
+            "name": "Revision detected",
+            "state": "succeeded",
+            "started_at": "2026-11-18T00:41:08Z",
+            "completed_at": "2026-11-18T00:41:08Z",
+            "detail": "mynids at cda9ccc",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 2,
+            "name": "Sync",
+            "state": "succeeded",
+            "started_at": "2026-11-18T00:41:08Z",
+            "completed_at": "2026-11-18T00:41:09Z",
+            "detail": "Sync succeeded, health progressing",
+            "reconstructed": false
+          }
+        ]
+      },
+      {
+        "key": "rollout",
+        "position": 3,
+        "state": "succeeded",
+        "attempt": 1,
+        "started_at": "2026-11-18T00:41:09Z",
+        "completed_at": "2026-11-18T00:41:35Z",
+        "summary": "1/1 pods ready on sha256:b473b607cdc6",
+        "steps": [
+          {
+            "attempt": 1,
+            "position": 1,
+            "name": "New ReplicaSet",
+            "state": "succeeded",
+            "started_at": "2026-11-18T00:41:09Z",
+            "completed_at": "2026-11-18T00:41:09Z",
+            "detail": "nids-5b4d56bf65, revision 50",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 2,
+            "name": "Pod nids-5b4d56bf65-jvtl4",
+            "state": "succeeded",
+            "started_at": "2026-11-18T00:41:09Z",
+            "completed_at": "2026-11-18T00:41:30Z",
+            "detail": "Ready on sha256:b473b607cdc6, 0 restarts",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 3,
+            "name": "Old pods scaled down",
+            "state": "succeeded",
+            "started_at": "2026-11-18T00:41:09Z",
+            "completed_at": "2026-11-18T00:41:09.740233284Z",
+            "detail": "No old pods remain",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 4,
+            "name": "Digest check",
+            "state": "succeeded",
+            "completed_at": "2026-11-18T00:41:35Z",
+            "detail": "1 ready pods on sha256:b473b607cdc6, read from the pods: the template names the image by tag",
+            "reconstructed": false
+          }
+        ]
+      },
+      {
+        "key": "verify",
+        "position": 4,
+        "state": "skipped",
+        "attempt": 1,
+        "summary": "The new pods carry no release-id annotation to check X-Release-ID against"
+      }
+    ]
+  }
+}

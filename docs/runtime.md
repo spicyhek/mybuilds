@@ -67,6 +67,7 @@ Within the window, the new ReplicaSet is the one at the Deployment's
 | --- | --- |
 | succeeded | The Deployment's observed generation is current; desired, updated, available and total replicas are equal; and every Ready pod of the new ReplicaSet runs the release digest. Completion time is the Progressing condition's `NewReplicaSetAvailable` update time. |
 | failed | Progressing is `False` with `ProgressDeadlineExceeded`; a container of a new pod has restarted 3 times; or a Ready new pod runs another digest. |
+| succeeded, image by tag | A config release whose template names the image by tag, as before a service's first digest-pinned release, has no digest to expect. The first Ready new pod's digest is taken, every other Ready new pod must run the same one, and the Digest check step says so. Pods of one tag on different digests, such as a tag re-pushed mid-rollout, fail. |
 | succeeded, scaled to zero | The Deployment wants no replicas, its observed generation is current and no pods are left. There is no digest to check. A config release's summary then names no serving release. |
 | running | Evidence exists and neither of the above holds yet. |
 | unknown | The window closed with no evidence, or before the rollout finished. |
