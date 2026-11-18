@@ -38,6 +38,12 @@ type env struct {
 
 func newEnv(t *testing.T, verifyURL string) *env {
 	t.Helper()
+	return newEnvVerify(t, services.Verify{URL: verifyURL, MaxLatencyMS: 2000})
+}
+
+// newEnvVerify is newEnv with a whole verify entry for the test service.
+func newEnvVerify(t *testing.T, verify services.Verify) *env {
+	t.Helper()
 	ctx := context.Background()
 	store, err := storage.Open(ctx, filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
@@ -47,13 +53,17 @@ func newEnv(t *testing.T, verifyURL string) *env {
 	if _, err := store.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
+	verifyJSON, err := json.Marshal(verify)
+	if err != nil {
+		t.Fatal(err)
+	}
 	svcs, err := services.Parse([]byte(fmt.Sprintf(`{"services": [{
 		"name": "personal-site", "environment": "production",
 		"repository": "spicyhek/homelab-hosted-personal-site", "workflow": ".github/workflows/release.yml",
 		"branch": "main", "argocd_application": "personal-site", "artifact": %q,
 		"workload": {"namespace": "default", "deployment": "personal-site"},
-		"verify": {"url": %q, "max_latency_ms": 2000}
-	}]}`, image, verifyURL)))
+		"verify": %s
+	}]}`, image, verifyJSON)))
 	if err != nil {
 		t.Fatal(err)
 	}
