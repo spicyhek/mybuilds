@@ -80,7 +80,7 @@ A failed Argo CD sync applied nothing, so Rollout is skipped.
 | --- | --- |
 | New ReplicaSet | Its name, revision and creation time |
 | Pod `<name>` | Created to Ready, with the running digest and restarts; while waiting, the reason, such as `ContainerCreating`, `ImagePullBackOff` or `CrashLoopBackOff` |
-| Old pods scaled down | The Deployment's total replicas reaching its updated replicas |
+| Old pods scaled down | The Deployment's total replicas reaching its updated replicas, in a status whose observed generation is current (an older status still counts the previous rollout) |
 | Digest check | Every Ready new pod's `imageID` against the release digest |
 
 ### Reconstructed steps

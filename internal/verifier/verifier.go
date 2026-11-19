@@ -24,6 +24,11 @@ const (
 	DefaultInterval = 30 * time.Second
 	// DefaultTick is how often the verifier looks for work.
 	DefaultTick = 5 * time.Second
+	// DefaultFirstCheckDelay is how long after Rollout completes the first
+	// check waits. Rollout completes as the old pods are removed, and the
+	// Service needs a moment to route only to the new ones: a check in that
+	// moment, as for mynids/7eed2b5/production/34, found no endpoint.
+	DefaultFirstCheckDelay = 10 * time.Second
 )
 
 // Store is what the verifier needs from storage.
@@ -55,7 +60,10 @@ type Options struct {
 	Checker    Checker
 	Interval   time.Duration
 	Tick       time.Duration
-	Now        func() time.Time
+	// FirstCheckDelay is the wait between Rollout's completion and the
+	// first check. Zero uses DefaultFirstCheckDelay.
+	FirstCheckDelay time.Duration
+	Now             func() time.Time
 	// WatchSyncedAt reports when the runtime watch completed its initial
 	// list. A config release is only recorded as replacing no pods when the
 	// watch was running since before its sync started. Nil means there is
@@ -83,6 +91,9 @@ func New(o Options) *Verifier {
 	}
 	if o.Tick == 0 {
 		o.Tick = DefaultTick
+	}
+	if o.FirstCheckDelay == 0 {
+		o.FirstCheckDelay = DefaultFirstCheckDelay
 	}
 	if o.Now == nil {
 		o.Now = time.Now
@@ -167,6 +178,8 @@ func (v *Verifier) Step(ctx context.Context) error {
 		case c.Expected == "":
 			// A config release whose pods carry no release ID; the
 			// projection skips its Verify.
+		case c.LastCheckAt == nil && now.Sub(c.RolloutCompletedAt) < v.opts.FirstCheckDelay:
+			// Too soon after the old pods went away.
 		case c.LastCheckAt == nil || now.Sub(*c.LastCheckAt) >= v.opts.Interval:
 			if err := v.check(ctx, svc, c.ReleaseID, c.Expected, now); err != nil {
 				return err
@@ -222,7 +235,8 @@ func (v *Verifier) check(ctx context.Context, svc services.Service, releaseID, e
 		log = v.opts.Logger.Warn
 	}
 	log("verification check", "release_id", releaseID, "result", res.Result, "status", res.StatusCode,
-		"latency_ms", res.LatencyMS, "observed_release_id", res.ObservedReleaseID, "colo", res.Colo, "reason", res.Reason)
+		"latency_ms", res.LatencyMS, "observed_release_id", res.ObservedReleaseID, "colo", res.Colo, "reason", res.Reason,
+		"error", res.Error)
 	return v.store(ctx, events.TypeVerifyCheck,
 		fmt.Sprintf("check/%s/%d", releaseID, res.CheckedAt.UnixNano()), releaseID, res.CheckedAt, res)
 }

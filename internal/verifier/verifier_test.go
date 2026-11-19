@@ -148,7 +148,7 @@ func TestVerifierChecksUntilVerified(t *testing.T) {
 		t.Fatalf("rollout %s (%s)", st.State, st.FailureReason)
 	}
 
-	now := at(120)
+	now := at(120) // 6 s after Rollout: too soon for the first check
 	v := e.verifier(c, &now)
 	step := func() {
 		t.Helper()
@@ -156,6 +156,11 @@ func TestVerifierChecksUntilVerified(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	step()
+	if st := e.stage(id, "verify"); len(st.Steps) != 0 {
+		t.Fatalf("checked %s after Rollout: %+v", now.Sub(at(114)), st.Steps)
+	}
+	now = at(124)
 	step()
 	step() // not due again yet
 	if st := e.stage(id, "verify"); st.State != releases.StateRunning || st.Summary != "1 of 5 consecutive checks passed" {

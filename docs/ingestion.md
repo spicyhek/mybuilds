@@ -46,6 +46,40 @@ Only runs of the workflow named in the service map, triggered by a push to
 its branch, become releases. Jobs are linked to their release by run ID.
 Runner names and IDs, log URLs and HTML URLs are dropped before storage.
 
+### Following steps of running jobs
+
+GitHub sends a `workflow_job` webhook when a job is queued, starts and
+completes, never when a step does. The `in_progress` webhook carries the
+steps as they stood when the job started, so on its own a release shows the
+job's second or third step running until the job ends. Release
+`mynids/09f36c4/production/35` showed "Set up Node for dashboard tests" for
+the ten minutes its tests and image build took.
+
+With `MYBUILDS_GITHUB_TOKEN` set, mybuilds polls each running job of a
+release run with `GET /repos/{owner}/{repo}/actions/jobs/{job_id}`:
+
+- A job is polled every 10 seconds from its `in_progress` webhook until a
+  `completed` one is stored, for at most 6 hours. Jobs of runs that are not
+  releases are never polled.
+- Each change in the job's steps is stored as a `github.workflow_job` event
+  with `"action": "polled"`, the delivery ID `poll/<job_id>/<hash>`, and the
+  time of its latest step change. The same allowlist applies as for
+  webhooks. The projection folds it like a webhook, and a late webhook never
+  takes a job back to fewer steps.
+- If the job finishes between polls, the poll records `completed` even when
+  the webhook is lost.
+- Polls send `If-None-Match`, so an unchanged job costs a `304`, which GitHub
+  does not count against an authenticated rate limit (it does count without
+  a token, whose 60 requests an hour would not last one build). A rate-limit response pauses all
+  polling until its reset; a `404` (deleted run) stops polling that job.
+- `mybuilds_github_job_polls_total{result}` counts `changed`, `unchanged`,
+  `gone`, `rate_limited` and `error`.
+
+The token needs only read access to Actions: a fine-grained personal access
+token limited to the tracked repositories, with **Actions: Read-only**
+(Metadata: Read-only is implied). It is sent only to `api.github.com` and
+never logged. Without it, steps update only at a job's start and end.
+
 ## CI-signed events
 
 The release workflow sends one JSON body per event. Unknown fields are

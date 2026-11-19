@@ -321,6 +321,9 @@ type VerifyCheck struct {
 	// Reason explains a result other than pass. It is built from the fields
 	// below, never copied from an error message.
 	Reason string `json:"reason,omitempty"`
+	// Error is the client's error for a check that got no response. It is
+	// logged, never stored or served.
+	Error string `json:"-"`
 
 	DNSOK        bool       `json:"dns_ok"`
 	TLSOK        bool       `json:"tls_ok"`
