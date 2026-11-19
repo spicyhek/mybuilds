@@ -48,28 +48,33 @@ type workflowRunPayload struct {
 type workflowJobPayload struct {
 	Action      string     `json:"action"`
 	Repository  repository `json:"repository"`
-	WorkflowJob *struct {
-		ID           int64      `json:"id"`
-		RunID        int64      `json:"run_id"`
-		RunAttempt   int        `json:"run_attempt"`
-		Name         string     `json:"name"`
-		WorkflowName string     `json:"workflow_name"`
-		HeadSHA      string     `json:"head_sha"`
-		Status       string     `json:"status"`
-		Conclusion   *string    `json:"conclusion"`
-		CreatedAt    *time.Time `json:"created_at"`
-		StartedAt    *time.Time `json:"started_at"`
-		CompletedAt  *time.Time `json:"completed_at"`
-		Labels       []string   `json:"labels"`
-		Steps        []struct {
-			Name        string     `json:"name"`
-			Number      int        `json:"number"`
-			Status      string     `json:"status"`
-			Conclusion  *string    `json:"conclusion"`
-			StartedAt   *time.Time `json:"started_at"`
-			CompletedAt *time.Time `json:"completed_at"`
-		} `json:"steps"`
-	} `json:"workflow_job"`
+	WorkflowJob *Job       `json:"workflow_job"`
+}
+
+// Job is a workflow job as GitHub sends it, in a workflow_job webhook and
+// from the REST API's GET /repos/{owner}/{repo}/actions/jobs/{job_id}.
+// Only the fields mybuilds keeps are decoded.
+type Job struct {
+	ID           int64      `json:"id"`
+	RunID        int64      `json:"run_id"`
+	RunAttempt   int        `json:"run_attempt"`
+	Name         string     `json:"name"`
+	WorkflowName string     `json:"workflow_name"`
+	HeadSHA      string     `json:"head_sha"`
+	Status       string     `json:"status"`
+	Conclusion   *string    `json:"conclusion"`
+	CreatedAt    *time.Time `json:"created_at"`
+	StartedAt    *time.Time `json:"started_at"`
+	CompletedAt  *time.Time `json:"completed_at"`
+	Labels       []string   `json:"labels"`
+	Steps        []struct {
+		Name        string     `json:"name"`
+		Number      int        `json:"number"`
+		Status      string     `json:"status"`
+		Conclusion  *string    `json:"conclusion"`
+		StartedAt   *time.Time `json:"started_at"`
+		CompletedAt *time.Time `json:"completed_at"`
+	} `json:"steps"`
 }
 
 // Translate turns an authenticated webhook into an event. A nil event with a
@@ -162,21 +167,35 @@ func translateJob(delivery string, body []byte) (*events.Event, error) {
 	if err := json.Unmarshal(body, &p); err != nil {
 		return nil, fmt.Errorf("decode workflow_job: %w", err)
 	}
-	job := p.WorkflowJob
-	if job == nil || job.ID == 0 || job.RunID == 0 || job.Name == "" {
+	if p.WorkflowJob == nil {
+		return nil, errors.New("workflow_job payload is missing id, run_id or name")
+	}
+	ev, err := JobEvent(*p.WorkflowJob, p.Action, p.Repository.FullName)
+	if err != nil {
+		return nil, err
+	}
+	ev.DeliveryID = delivery
+	return ev, nil
+}
+
+// JobEvent normalizes a job into a workflow_job event with no delivery ID.
+// action is the webhook's action, or ActionPolled for a job read from the
+// REST API.
+func JobEvent(job Job, action, repo string) (*events.Event, error) {
+	if job.ID == 0 || job.RunID == 0 || job.Name == "" {
 		return nil, errors.New("workflow_job payload is missing id, run_id or name")
 	}
 
 	// Allowlist: runner IDs and names, log and HTML URLs and check-run
 	// links are dropped here (plan section 8.1).
 	out := events.WorkflowJob{
-		Action:       p.Action,
+		Action:       action,
 		RunID:        job.RunID,
 		RunAttempt:   max(job.RunAttempt, 1),
 		JobID:        job.ID,
 		JobName:      job.Name,
 		WorkflowName: job.WorkflowName,
-		Repository:   p.Repository.FullName,
+		Repository:   repo,
 		HeadSHA:      job.HeadSHA,
 		Status:       job.Status,
 		Conclusion:   deref(job.Conclusion),
@@ -204,19 +223,46 @@ func translateJob(delivery string, body []byte) (*events.Event, error) {
 	switch {
 	case job.Status == "completed" && out.CompletedAt != nil:
 		occurred = *out.CompletedAt
+	case job.Status == "in_progress" && action == ActionPolled:
+		// A polled snapshot happened at its latest step change, so it
+		// sorts after the job's start and before its completion.
+		occurred = latestStepChange(out)
 	case job.Status == "in_progress" && out.StartedAt != nil:
 		occurred = *out.StartedAt
 	case out.CreatedAt != nil:
 		occurred = *out.CreatedAt
 	}
 	return &events.Event{
-		DeliveryID: delivery,
 		Type:       events.TypeWorkflowJob,
 		Attempt:    out.RunAttempt,
 		OccurredAt: occurred,
 		Keys:       events.Keys{RunID: job.RunID},
 		Payload:    payload,
 	}, nil
+}
+
+// ActionPolled is the action of a workflow_job event read from the REST API
+// rather than delivered by a webhook.
+const ActionPolled = "polled"
+
+// latestStepChange is the job's start or its latest step start or
+// completion, whichever is last.
+func latestStepChange(job events.WorkflowJob) time.Time {
+	var t time.Time
+	consider := func(p *time.Time) {
+		if p != nil && p.After(t) {
+			t = *p
+		}
+	}
+	consider(job.StartedAt)
+	for _, s := range job.Steps {
+		consider(s.StartedAt)
+		consider(s.CompletedAt)
+	}
+	if t.IsZero() && job.CreatedAt != nil {
+		t = *job.CreatedAt
+	}
+	return t
 }
 
 func deref(s *string) string {

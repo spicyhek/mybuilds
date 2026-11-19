@@ -345,7 +345,9 @@ func (f *fold) rollout(st *Stage, r Release, rt *Runtime) []Step {
 			firstAt = timePtr(e.OccurredAt)
 		}
 		res = v.evaluate(r.ArtifactDigest, artifact, e.OccurredAt)
-		if d := v.dep; oldScaledAt == nil && d != nil && res.newRS != nil &&
+		// A Deployment status older than its spec still counts the previous
+		// rollout's pods, so it says nothing about the old ones yet.
+		if d := v.dep; oldScaledAt == nil && d != nil && res.newRS != nil && d.ObservedGeneration >= d.Generation &&
 			d.UpdatedReplicas == d.Replicas && d.StatusReplicas == d.UpdatedReplicas {
 			oldScaledAt = timePtr(e.OccurredAt)
 		}

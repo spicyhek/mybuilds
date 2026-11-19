@@ -1,0 +1,608 @@
+{
+  "release_id": "mynids/7eed2b5/production/34",
+  "events": 35,
+  "frames": [
+    "2026-11-19T04:01:00Z github.workflow_run running | source=succeeded(2) build=running publish=pending gitops=pending reconcile=pending rollout=pending verify=pending",
+    "2026-11-19T04:01:01Z github.workflow_job running | source=succeeded(2) build=running publish=pending gitops=pending reconcile=pending rollout=pending verify=pending",
+    "2026-11-19T04:01:04Z github.workflow_job running | source=succeeded(2) build=running(1) publish=pending gitops=pending reconcile=pending rollout=pending verify=pending",
+    "2026-11-19T04:01:05Z github.workflow_run running | source=succeeded(2) build=running(1) publish=pending gitops=pending reconcile=pending rollout=pending verify=pending",
+    "2026-11-19T04:11:50Z ci.release.published running | source=succeeded(2) build=succeeded(1) publish=succeeded(1) gitops=pending reconcile=pending rollout=pending verify=pending",
+    "2026-11-19T04:12:09Z github.workflow_job running | source=succeeded(2) build=succeeded(1) publish=succeeded(1) gitops=running reconcile=pending rollout=pending verify=pending",
+    "2026-11-19T04:12:09Z github.workflow_job running | source=succeeded(2) build=succeeded(11) publish=succeeded(13) gitops=running reconcile=pending rollout=pending verify=pending",
+    "2026-11-19T04:12:11Z github.workflow_job running | source=succeeded(2) build=succeeded(11) publish=succeeded(13) gitops=running(11) reconcile=pending rollout=pending verify=pending",
+    "2026-11-19T04:12:12Z github.workflow_run running | source=succeeded(2) build=succeeded(11) publish=succeeded(13) gitops=running(11) reconcile=pending rollout=pending verify=pending",
+    "2026-11-19T04:12:22Z ci.gitops.updated running | source=succeeded(2) build=succeeded(11) publish=succeeded(13) gitops=succeeded(12) reconcile=pending rollout=pending verify=pending",
+    "2026-11-19T04:12:25Z github.workflow_run running | source=succeeded(2) build=succeeded(11) publish=succeeded(13) gitops=succeeded(12) reconcile=pending rollout=pending verify=pending",
+    "2026-11-19T04:12:25Z github.workflow_job running | source=succeeded(2) build=succeeded(11) publish=succeeded(13) gitops=succeeded(14) reconcile=pending rollout=pending verify=pending",
+    "2026-11-19T04:15:43Z argocd.notification running | source=succeeded(2) build=succeeded(11) publish=succeeded(13) gitops=succeeded(14) reconcile=running(2) rollout=pending verify=pending",
+    "2026-11-19T04:15:44Z argocd.notification running | source=succeeded(2) build=succeeded(11) publish=succeeded(13) gitops=succeeded(14) reconcile=succeeded(2) rollout=pending verify=pending",
+    "2026-11-19T04:15:44Z k8s.deployment running | source=succeeded(2) build=succeeded(11) publish=succeeded(13) gitops=succeeded(14) reconcile=succeeded(2) rollout=running verify=pending",
+    "2026-11-19T04:15:44Z k8s.deployment running | source=succeeded(2) build=succeeded(11) publish=succeeded(13) gitops=succeeded(14) reconcile=succeeded(2) rollout=running(2) verify=pending",
+    "2026-11-19T04:15:44Z k8s.pod running | source=succeeded(2) build=succeeded(11) publish=succeeded(13) gitops=succeeded(14) reconcile=succeeded(2) rollout=running(3) verify=pending",
+    "2026-11-19T04:15:44Z k8s.deployment running | source=succeeded(2) build=succeeded(11) publish=succeeded(13) gitops=succeeded(14) reconcile=succeeded(2) rollout=running(3) verify=pending",
+    "2026-11-19T04:15:44Z k8s.deployment running | source=succeeded(2) build=succeeded(11) publish=succeeded(13) gitops=succeeded(14) reconcile=succeeded(2) rollout=running(3) verify=pending",
+    "2026-11-19T04:15:44Z k8s.replicaset running | source=succeeded(2) build=succeeded(11) publish=succeeded(13) gitops=succeeded(14) reconcile=succeeded(2) rollout=running(3) verify=pending",
+    "2026-11-19T04:15:44Z k8s.pod running | source=succeeded(2) build=succeeded(11) publish=succeeded(13) gitops=succeeded(14) reconcile=succeeded(2) rollout=running(3) verify=pending",
+    "2026-11-19T04:18:04Z k8s.pod running | source=succeeded(2) build=succeeded(11) publish=succeeded(13) gitops=succeeded(14) reconcile=succeeded(2) rollout=running(3) verify=pending",
+    "2026-11-19T04:18:05Z k8s.pod running | source=succeeded(2) build=succeeded(11) publish=succeeded(13) gitops=succeeded(14) reconcile=succeeded(2) rollout=running(4) verify=pending",
+    "2026-11-19T04:18:55Z k8s.replicaset running | source=succeeded(2) build=succeeded(11) publish=succeeded(13) gitops=succeeded(14) reconcile=succeeded(2) rollout=running(4) verify=pending",
+    "2026-11-19T04:18:56Z k8s.deployment running | source=succeeded(2) build=succeeded(11) publish=succeeded(13) gitops=succeeded(14) reconcile=succeeded(2) rollout=running(4) verify=pending",
+    "2026-11-19T04:18:56Z k8s.deployment running | source=succeeded(2) build=succeeded(11) publish=succeeded(13) gitops=succeeded(14) reconcile=succeeded(2) rollout=succeeded(4) verify=pending",
+    "2026-11-19T04:18:56Z verifier.check running | source=succeeded(2) build=succeeded(11) publish=succeeded(13) gitops=succeeded(14) reconcile=succeeded(2) rollout=succeeded(4) verify=running(2)"
+  ],
+  "frames_sha256": "3ceccc5c6a76dd9072baed0fd8059293eaae482c03f0b2b93f04d7922fd2ef05",
+  "release": {
+    "release_id": "mynids/7eed2b5/production/34",
+    "service": "mynids",
+    "environment": "production",
+    "kind": "application",
+    "template": "application",
+    "drill": false,
+    "superseded": false,
+    "source_repository": "spicyhek/mynids",
+    "source_sha": "7eed2b559c67d652735836a890931fd8f700eb18",
+    "artifact": "ghcr.io/spicyhek/mynids",
+    "artifact_digest": "sha256:561a15e10743d766566f3ba0615b78b294a4511fd90a7913ba6b9b0f7e78c459",
+    "gitops_repository": "spicyhek/homelab-infra",
+    "gitops_sha": "5a6ade9ffd1c7f7c9903ada9f0469bf2e71b82bc",
+    "runtime_release_id": "mynids/7eed2b5/production/34",
+    "status": "running",
+    "created_at": "2026-11-19T04:01:00Z",
+    "stages": [
+      {
+        "key": "source",
+        "position": 1,
+        "state": "succeeded",
+        "attempt": 1,
+        "started_at": "2026-11-19T04:01:00Z",
+        "completed_at": "2026-11-19T04:01:00Z",
+        "summary": "Push to main, 7eed2b5",
+        "steps": [
+          {
+            "attempt": 1,
+            "position": 1,
+            "name": "Push to main",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:01:00Z",
+            "completed_at": "2026-11-19T04:01:00Z",
+            "detail": "7eed2b5",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 2,
+            "name": "Workflow triggered",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:01:00Z",
+            "completed_at": "2026-11-19T04:01:00Z",
+            "detail": "Run #34",
+            "reconstructed": false
+          }
+        ]
+      },
+      {
+        "key": "build",
+        "position": 2,
+        "state": "succeeded",
+        "attempt": 1,
+        "started_at": "2026-11-19T04:01:05Z",
+        "completed_at": "2026-11-19T04:04:02Z",
+        "summary": "Image built",
+        "steps": [
+          {
+            "attempt": 1,
+            "position": 1,
+            "name": "Set up job",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:01:05Z",
+            "completed_at": "2026-11-19T04:01:08Z",
+            "detail": "3s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 2,
+            "name": "Check out app repository",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:01:08Z",
+            "completed_at": "2026-11-19T04:01:10Z",
+            "detail": "2s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 3,
+            "name": "Set release ID",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:01:10Z",
+            "completed_at": "2026-11-19T04:01:10Z",
+            "detail": "0s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 4,
+            "name": "Set up Python for regression tests",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:01:10Z",
+            "completed_at": "2026-11-19T04:01:10Z",
+            "detail": "0s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 5,
+            "name": "Set up Node for dashboard tests",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:01:10Z",
+            "completed_at": "2026-11-19T04:01:10Z",
+            "detail": "0s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 6,
+            "name": "Run regression tests before publishing",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:01:10Z",
+            "completed_at": "2026-11-19T04:01:27Z",
+            "detail": "17s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 7,
+            "name": "Set up QEMU",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:01:27Z",
+            "completed_at": "2026-11-19T04:01:34Z",
+            "detail": "7s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 8,
+            "name": "Set up Docker Buildx",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:01:34Z",
+            "completed_at": "2026-11-19T04:01:40Z",
+            "detail": "6s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 9,
+            "name": "Log in to GitHub Container Registry",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:01:40Z",
+            "completed_at": "2026-11-19T04:01:41Z",
+            "detail": "1s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 10,
+            "name": "Build image",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:01:41Z",
+            "completed_at": "2026-11-19T04:03:50Z",
+            "detail": "2m9s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 11,
+            "name": "Smoke test",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:03:50Z",
+            "completed_at": "2026-11-19T04:04:02Z",
+            "detail": "12s",
+            "reconstructed": false
+          }
+        ]
+      },
+      {
+        "key": "publish",
+        "position": 3,
+        "state": "succeeded",
+        "attempt": 1,
+        "started_at": "2026-11-19T04:04:02Z",
+        "completed_at": "2026-11-19T04:11:50Z",
+        "summary": "sha256:561a15e10743",
+        "steps": [
+          {
+            "attempt": 1,
+            "position": 1,
+            "name": "Push image",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:04:02Z",
+            "completed_at": "2026-11-19T04:11:50Z",
+            "detail": "7m48s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 2,
+            "name": "Resolve digest",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:11:50Z",
+            "completed_at": "2026-11-19T04:11:50Z",
+            "detail": "0s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 3,
+            "name": "Report release to mybuilds",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:11:50Z",
+            "completed_at": "2026-11-19T04:11:51Z",
+            "detail": "1s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 4,
+            "name": "Post Push image",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:11:51Z",
+            "completed_at": "2026-11-19T04:11:53Z",
+            "detail": "2s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 5,
+            "name": "Post Build image",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:11:53Z",
+            "completed_at": "2026-11-19T04:11:54Z",
+            "detail": "1s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 6,
+            "name": "Post Log in to GitHub Container Registry",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:11:54Z",
+            "completed_at": "2026-11-19T04:11:55Z",
+            "detail": "1s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 7,
+            "name": "Post Set up Docker Buildx",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:11:55Z",
+            "completed_at": "2026-11-19T04:12:03Z",
+            "detail": "8s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 8,
+            "name": "Post Set up QEMU",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:12:03Z",
+            "completed_at": "2026-11-19T04:12:05Z",
+            "detail": "2s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 9,
+            "name": "Post Set up Node for dashboard tests",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:12:05Z",
+            "completed_at": "2026-11-19T04:12:05Z",
+            "detail": "0s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 10,
+            "name": "Post Set up Python for regression tests",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:12:05Z",
+            "completed_at": "2026-11-19T04:12:06Z",
+            "detail": "1s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 11,
+            "name": "Post Check out app repository",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:12:06Z",
+            "completed_at": "2026-11-19T04:12:06Z",
+            "detail": "0s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 12,
+            "name": "Complete job",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:12:06Z",
+            "completed_at": "2026-11-19T04:12:06Z",
+            "detail": "0s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 13,
+            "name": "Send release.published",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:11:50Z",
+            "completed_at": "2026-11-19T04:11:50Z",
+            "detail": "sha256:561a15e10743",
+            "reconstructed": false
+          }
+        ]
+      },
+      {
+        "key": "gitops",
+        "position": 4,
+        "state": "succeeded",
+        "attempt": 1,
+        "started_at": "2026-11-19T04:12:12Z",
+        "completed_at": "2026-11-19T04:12:22Z",
+        "summary": "homelab-infra@5a6ade9",
+        "steps": [
+          {
+            "attempt": 1,
+            "position": 1,
+            "name": "Set up job",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:12:12Z",
+            "completed_at": "2026-11-19T04:12:13Z",
+            "detail": "1s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 2,
+            "name": "Check out app repository",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:12:13Z",
+            "completed_at": "2026-11-19T04:12:14Z",
+            "detail": "1s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 3,
+            "name": "Check for newer commit",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:12:14Z",
+            "completed_at": "2026-11-19T04:12:14Z",
+            "detail": "0s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 4,
+            "name": "Report superseded release to mybuilds",
+            "state": "skipped",
+            "started_at": "2026-11-19T04:12:14Z",
+            "completed_at": "2026-11-19T04:12:14Z",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 5,
+            "name": "Check out infra repository",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:12:14Z",
+            "completed_at": "2026-11-19T04:12:15Z",
+            "detail": "1s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 6,
+            "name": "Pin image digest",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:12:15Z",
+            "completed_at": "2026-11-19T04:12:15Z",
+            "detail": "0s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 7,
+            "name": "Bump Zeek converter",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:12:15Z",
+            "completed_at": "2026-11-19T04:12:15Z",
+            "detail": "0s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 8,
+            "name": "Commit and open pull request",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:12:15Z",
+            "completed_at": "2026-11-19T04:12:18Z",
+            "detail": "3s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 9,
+            "name": "Squash merge",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:12:18Z",
+            "completed_at": "2026-11-19T04:12:22Z",
+            "detail": "4s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 10,
+            "name": "Report GitOps update to mybuilds",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:12:22Z",
+            "completed_at": "2026-11-19T04:12:22Z",
+            "detail": "0s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 11,
+            "name": "Post Check out infra repository",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:12:22Z",
+            "completed_at": "2026-11-19T04:12:23Z",
+            "detail": "1s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 12,
+            "name": "Post Check out app repository",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:12:23Z",
+            "completed_at": "2026-11-19T04:12:23Z",
+            "detail": "0s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 13,
+            "name": "Complete job",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:12:23Z",
+            "completed_at": "2026-11-19T04:12:23Z",
+            "detail": "0s",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 14,
+            "name": "Send gitops.updated",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:12:22Z",
+            "completed_at": "2026-11-19T04:12:22Z",
+            "detail": "5a6ade9",
+            "reconstructed": false
+          }
+        ]
+      },
+      {
+        "key": "reconcile",
+        "position": 5,
+        "state": "succeeded",
+        "attempt": 1,
+        "started_at": "2026-11-19T04:15:43Z",
+        "completed_at": "2026-11-19T04:15:44Z",
+        "summary": "Synced 5a6ade9",
+        "steps": [
+          {
+            "attempt": 1,
+            "position": 1,
+            "name": "Revision detected",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:15:43Z",
+            "completed_at": "2026-11-19T04:15:43Z",
+            "detail": "mynids at 5a6ade9",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 2,
+            "name": "Sync",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:15:43Z",
+            "completed_at": "2026-11-19T04:15:44Z",
+            "detail": "Sync succeeded, health progressing",
+            "reconstructed": false
+          }
+        ]
+      },
+      {
+        "key": "rollout",
+        "position": 6,
+        "state": "succeeded",
+        "attempt": 1,
+        "started_at": "2026-11-19T04:15:44Z",
+        "completed_at": "2026-11-19T04:18:56Z",
+        "summary": "1/1 pods ready on sha256:561a15e10743",
+        "steps": [
+          {
+            "attempt": 1,
+            "position": 1,
+            "name": "New ReplicaSet",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:15:44Z",
+            "completed_at": "2026-11-19T04:15:44Z",
+            "detail": "nids-5fd6f94fb6, revision 51",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 2,
+            "name": "Pod nids-5fd6f94fb6-pfb55",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:15:44Z",
+            "completed_at": "2026-11-19T04:18:05Z",
+            "detail": "Ready on sha256:561a15e10743, 0 restarts",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 3,
+            "name": "Old pods scaled down",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:15:44Z",
+            "completed_at": "2026-11-19T04:18:56.347864617Z",
+            "detail": "No old pods remain",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 4,
+            "name": "Digest check",
+            "state": "succeeded",
+            "completed_at": "2026-11-19T04:18:56Z",
+            "detail": "1 ready pods on sha256:561a15e10743",
+            "reconstructed": false
+          }
+        ]
+      },
+      {
+        "key": "verify",
+        "position": 7,
+        "state": "running",
+        "attempt": 1,
+        "started_at": "2026-11-19T04:18:56.449243382Z",
+        "summary": "0 of 5 consecutive checks passed, last check failed: HTTP 502 is not an allowed status",
+        "steps": [
+          {
+            "attempt": 1,
+            "position": 1,
+            "name": "DNS + TLS",
+            "state": "succeeded",
+            "started_at": "2026-11-19T04:18:56.449243382Z",
+            "completed_at": "2026-11-19T04:18:56.449243382Z",
+            "detail": "TLS 1.3, certificate valid until 2027-01-16",
+            "reconstructed": false
+          },
+          {
+            "attempt": 1,
+            "position": 2,
+            "name": "Check 1",
+            "state": "degraded",
+            "started_at": "2026-11-19T04:18:56.449243382Z",
+            "completed_at": "2026-11-19T04:18:56.575243382Z",
+            "detail": "HTTP 502 is not an allowed status, HTTP 502 in 126 ms, SJC, count reset",
+            "reconstructed": false
+          }
+        ]
+      }
+    ]
+  }
+}

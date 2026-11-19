@@ -125,6 +125,8 @@ health endpoints to the Go server on :8080.
 | `MYBUILDS_ARGOCD_TOKEN` | unset | Enables `POST /hooks/argocd` |
 | `MYBUILDS_RUNTIME_WATCH` | `auto` | `auto` watches Kubernetes when running in a cluster; `off` disables it |
 | `MYBUILDS_VERIFIER` | `auto` | `auto` checks public URLs unless in fixture mode; `off` disables it |
+| `MYBUILDS_GITHUB_TOKEN` | unset | Read-only token for following running jobs' steps; see [`docs/ingestion.md`](docs/ingestion.md#following-steps-of-running-jobs) |
+| `MYBUILDS_JOB_POLLER` | `auto` | `auto` polls running jobs when the token is set and not in fixture mode; `off` disables it |
 | `MYBUILDS_SERVICES_FILE` | built-in | Service map JSON; the built-in one is `internal/services/services.json` |
 
 An ingestion endpoint whose secret is unset answers `503`. Secrets are never

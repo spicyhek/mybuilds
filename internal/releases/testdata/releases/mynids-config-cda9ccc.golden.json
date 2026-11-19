@@ -19,7 +19,7 @@
     "2026-11-18T00:41:35Z k8s.deployment running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=running(4) verify=pending",
     "2026-11-18T00:41:35Z k8s.deployment succeeded | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=succeeded(4) verify=skipped"
   ],
-  "frames_sha256": "38f669d59f1421eccfc958d0c8000f28e1db67b7bae07c0066dba3dbc1036b34",
+  "frames_sha256": "89642b089c0ddee8df248e1ba1f0cceaa714eb84f72a1e02c95b962a1f7aed4d",
   "release": {
     "release_id": "mynids/config-cda9ccc/production",
     "service": "mynids",
@@ -125,7 +125,7 @@
             "name": "Old pods scaled down",
             "state": "succeeded",
             "started_at": "2026-11-18T00:41:09Z",
-            "completed_at": "2026-11-18T00:41:09.740233284Z",
+            "completed_at": "2026-11-18T00:41:35.569073038Z",
             "detail": "No old pods remain",
             "reconstructed": false
           },

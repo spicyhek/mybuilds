@@ -37,7 +37,7 @@ func TestMynidsDegradedHealthEndsVerifyDegraded(t *testing.T) {
 	e := newEnvVerify(t, verify)
 	id := e.rolledOut()
 
-	now := at(120)
+	now := at(124)
 	v := e.verifier(c, &now)
 	deadline := at(114).Add(verify.Window())
 	for now.Before(deadline.Add(time.Minute)) {

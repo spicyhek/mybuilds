@@ -24,6 +24,7 @@ import (
 	"github.com/spicyhek/mybuilds/internal/httpapi"
 	"github.com/spicyhek/mybuilds/internal/ingest"
 	"github.com/spicyhek/mybuilds/internal/ingest/queue"
+	"github.com/spicyhek/mybuilds/internal/jobpoller"
 	"github.com/spicyhek/mybuilds/internal/kube"
 	"github.com/spicyhek/mybuilds/internal/releases"
 	"github.com/spicyhek/mybuilds/internal/services"
@@ -141,6 +142,24 @@ func run() error {
 	}
 
 	watcher := startRuntimeWatch(ctx, cfg, logger, svcs, store, projector, hub)
+
+	// GitHub sends no webhook per step; the poller reads running jobs'
+	// steps from the REST API.
+	if cfg.JobPoller == "off" || cfg.GitHubToken == "" || cfg.Fixtures {
+		logger.Info("github job poller disabled", "setting", cfg.JobPoller,
+			"token", cfg.GitHubToken != "", "fixtures", cfg.Fixtures)
+	} else {
+		poller := jobpoller.New(jobpoller.Options{
+			Store:      store,
+			Projector:  projector,
+			Notify:     hub.Notify,
+			Logger:     logger,
+			Token:      cfg.GitHubToken,
+			UserAgent:  "mybuilds/" + version,
+			Registerer: prometheus.DefaultRegisterer,
+		})
+		go poller.Run(ctx)
+	}
 
 	// The verifier checks public URLs for real releases; fixture mode has
 	// none.

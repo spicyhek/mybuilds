@@ -140,6 +140,26 @@ func statusRank(status string) int {
 	return 0
 }
 
+// newerJob reports whether job is at least as far along as cur. A job's
+// status never goes back, and neither do its steps: between two snapshots of
+// one status, such as the in_progress webhook and a polled snapshot that
+// arrive in either order, the one with more step progress wins.
+func newerJob(job, cur events.WorkflowJob) bool {
+	if a, b := statusRank(job.Status), statusRank(cur.Status); a != b {
+		return a > b
+	}
+	return stepProgress(job) >= stepProgress(cur)
+}
+
+// stepProgress counts each started step once and each completed step twice.
+func stepProgress(job events.WorkflowJob) int {
+	n := 0
+	for _, s := range job.Steps {
+		n += statusRank(s.Status)
+	}
+	return n
+}
+
 func (f *fold) add(e events.Event) error {
 	switch e.Type {
 	case events.TypeWorkflowRun:
@@ -158,7 +178,7 @@ func (f *fold) add(e events.Event) error {
 			return err
 		}
 		k := jobKey{attempt: max(p.RunAttempt, 1), name: p.JobName}
-		if cur, ok := f.jobs[k]; !ok || statusRank(p.Status) >= statusRank(cur.job.Status) {
+		if cur, ok := f.jobs[k]; !ok || newerJob(p, cur.job) {
 			f.jobs[k] = &jobObs{job: p, eventID: e.ID}
 		}
 

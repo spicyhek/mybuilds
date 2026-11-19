@@ -12,6 +12,12 @@ import (
 // (plan section 8.5).
 const RequiredPasses = 5
 
+// FailuresInARow is how many consecutive failing checks fail Verify. One
+// failing check alone is a blip on the path between mybuilds and the
+// service, such as a dropped TLS handshake or the moment a Service swaps
+// endpoints, so it resets the count instead.
+const FailuresInARow = 2
+
 // Sample is one verification check, stored in verification_samples.
 type Sample struct {
 	Endpoint          string
@@ -38,12 +44,14 @@ type endObs struct {
 // already succeeded.
 //
 //   - Five consecutive passes succeed.
-//   - A failing check (DNS, TLS, connection, status code, latency) fails.
+//   - Two failing checks in a row (DNS, TLS, connection, status code,
+//     latency) fail. A single failing check resets the count.
 //   - A release mismatch or an unhealthy health body resets the count.
-//   - When the window closes without five passes, Verify is degraded if the
-//     health body was the only thing in the way, and failed otherwise. With
-//     no failed check to blame, such as when mybuilds was down for the
-//     window, it is unknown.
+//   - When the window closes without five passes, Verify is failed after a
+//     release mismatch or a failing check, and degraded if the health body
+//     was the only thing in the way. With nothing to blame, such as when
+//     mybuilds was down for the window, or when the only failing check was
+//     the last one and never confirmed, it is unknown.
 func (f *fold) verify(st *Stage, r Release) ([]Step, []Sample) {
 	if f.svc.Verify == nil && len(f.checks) == 0 {
 		st.State = StateSkipped
@@ -71,10 +79,11 @@ func (f *fold) verify(st *Stage, r Release) ([]Step, []Sample) {
 		steps = append(steps, s)
 	}
 
-	streak := 0
+	streak, failStreak, fails := 0, 0, 0
 	// lastBad is the latest check that reset the count; lastMismatch the
-	// latest that served another release, which a failure names.
-	var lastBad, lastMismatch *events.VerifyCheck
+	// latest that served another release, and lastFail the latest failing
+	// check, which a failure names.
+	var lastBad, lastMismatch, lastFail *events.VerifyCheck
 	var maxLatency int64
 	for i, obs := range checks {
 		c := obs.c
@@ -93,12 +102,13 @@ func (f *fold) verify(st *Stage, r Release) ([]Step, []Sample) {
 			SourceEventID: obs.eventID}
 		switch c.Result {
 		case events.CheckPass:
+			failStreak = 0
 			streak++
 			maxLatency = max(maxLatency, c.LatencyMS)
 			step.State = StateSucceeded
 			step.Detail = fmt.Sprintf("%s, %d of %d in a row", checkDetail(c), streak, RequiredPasses)
 		case events.CheckMismatch, events.CheckUnhealthy:
-			streak, maxLatency = 0, 0
+			streak, maxLatency, failStreak = 0, 0, 0
 			bad := c
 			lastBad = &bad
 			if c.Result == events.CheckMismatch {
@@ -107,10 +117,20 @@ func (f *fold) verify(st *Stage, r Release) ([]Step, []Sample) {
 			step.State = StateDegraded
 			step.Detail = fmt.Sprintf("%s, %s, count reset", checkDetail(c), c.Reason)
 		default:
-			step.State = StateFailed
+			streak, maxLatency = 0, 0
+			failStreak++
+			fails++
+			bad := c
+			lastBad, lastFail = &bad, &bad
 			step.Detail = checkDetail(c)
 			if c.Reason != "" {
 				step.Detail = c.Reason + ", " + step.Detail
+			}
+			if failStreak >= FailuresInARow {
+				step.State = StateFailed
+			} else {
+				step.State = StateDegraded
+				step.Detail += ", count reset"
 			}
 		}
 		add(step)
@@ -119,7 +139,7 @@ func (f *fold) verify(st *Stage, r Release) ([]Step, []Sample) {
 		case step.State == StateFailed:
 			st.State = StateFailed
 			st.CompletedAt = step.CompletedAt
-			st.FailureReason = orDefault(c.Reason, "Check failed")
+			st.FailureReason = fmt.Sprintf("%s (%d checks in a row)", orDefault(c.Reason, "Check failed"), failStreak)
 			return steps, samples
 		case streak >= RequiredPasses:
 			st.State = StateSucceeded
@@ -139,16 +159,24 @@ func (f *fold) verify(st *Stage, r Release) ([]Step, []Sample) {
 		case len(checks) == 0:
 			st.State = StateUnknown
 			st.FailureReason = "No checks ran during the verification window"
+		case lastMismatch != nil:
+			st.State = StateFailed
+			st.FailureReason = "Window closed: " + lastMismatch.Reason
+		case failStreak > 0 && fails == 1:
+			// The only failing check was the last one: nothing confirmed
+			// it, so it is no evidence the release is down.
+			st.State = StateUnknown
+			st.FailureReason = "Window closed before the failed check was confirmed: " + lastFail.Reason
+		case lastFail != nil:
+			st.State = StateFailed
+			st.FailureReason = fmt.Sprintf("Window closed after %d failed checks: %s", fails, lastFail.Reason)
 		case lastBad == nil:
 			st.State = StateUnknown
 			st.FailureReason = fmt.Sprintf("Only %d consecutive checks passed before the window closed", streak)
-		case lastMismatch == nil:
+		default:
 			st.State = StateDegraded
 			st.Summary = "Reachable and on this release, but the health check never passed 5 times in a row"
 			st.FailureReason = "Window closed: " + lastBad.Reason
-		default:
-			st.State = StateFailed
-			st.FailureReason = "Window closed: " + lastMismatch.Reason
 		}
 		if st.StartedAt == nil {
 			st.StartedAt = st.CompletedAt
@@ -159,6 +187,9 @@ func (f *fold) verify(st *Stage, r Release) ([]Step, []Sample) {
 	if len(checks) > 0 {
 		st.State = StateRunning
 		st.Summary = fmt.Sprintf("%d of %d consecutive checks passed", streak, RequiredPasses)
+		if failStreak > 0 {
+			st.Summary += ", last check failed: " + lastFail.Reason
+		}
 	}
 	return steps, samples
 }

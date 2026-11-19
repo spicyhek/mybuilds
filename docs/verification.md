@@ -52,22 +52,30 @@ The check's result is decided when it runs:
 | `pass` | Allowed status, matching release, under the latency limit, healthy body | Counts toward 5 in a row |
 | `mismatch` | Another release's `X-Release-ID`, or none, such as from an old replica | Resets the count |
 | `unhealthy` | The health body is not healthy or cannot be parsed | Resets the count |
-| `fail` | DNS, TLS, connection, timeout (10 s), a status code that is not allowed, or the latency limit | Fails Verify |
+| `fail` | DNS, TLS (handshake within 5 s), connection, timeout (10 s), a status code that is not allowed, or the latency limit | Resets the count; a second `fail` in a row fails Verify |
+
+One `fail` alone is treated as a blip on the path, not an outage. Release
+`mynids/09f36c4/production/35` lost one TLS handshake to Cloudflare between
+passes, and `mynids/7eed2b5/production/34` was checked in the instant its
+Service swapped endpoints. The client's own error for a check without a
+response is logged with the check, never stored: `reason` stays built from
+the recorded fields.
 
 The stored result is the evidence. Replaying a release gives the same
 outcome even after the service map changes.
 
 ## Outcomes
 
-Checks run 30 seconds apart, from Rollout's completion until the window
-closes.
+Checks run 30 seconds apart, from 10 seconds after Rollout's completion
+until the window closes. Rollout completes as the old pods are removed, and
+the wait lets the Service route to the new ones first.
 
 | Verify | When |
 | --- | --- |
 | succeeded | 5 consecutive passes. The release's `verified_at` is the fifth. |
-| failed | A `fail` check, or the window closed after a release mismatch |
+| failed | Two `fail` checks in a row, or the window closed after a release mismatch or a `fail` |
 | degraded | The window closed and only the health body stood in the way |
-| unknown | The window closed with no checks or with no failed check to blame, such as when mybuilds was down; or a newer release of the service rolled out first |
+| unknown | The window closed with no checks or with nothing to blame, such as when mybuilds was down, or when the only `fail` was the last check and never confirmed; or a newer release of the service rolled out first |
 | running | Checks so far, none of the above yet |
 
 The verifier keeps no state of its own. After a restart it reads which

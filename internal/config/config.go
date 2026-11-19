@@ -36,6 +36,13 @@ type Config struct {
 	// Verifier is "auto", which runs the public checks unless in fixture
 	// mode, or "off".
 	Verifier string
+	// GitHubToken lets the job poller read running jobs' steps from the
+	// REST API (docs/ingestion.md). Unset, steps update only when a job
+	// starts and ends. Never logged.
+	GitHubToken string
+	// JobPoller is "auto", which polls when GitHubToken is set and not in
+	// fixture mode, or "off".
+	JobPoller string
 	// SQSQueueURL enables the off-cluster ingestion buffer's consumer
 	// (docs/buffer.md). The region is read from the URL unless SQSRegion
 	// is set.
@@ -53,9 +60,9 @@ func (c Config) String() string {
 		}
 		return "set"
 	}
-	return fmt.Sprintf("listen=%s metrics=%s db=%s fixtures=%t services_file=%q github_secret=%s ci_secret=%s argocd_token=%s",
+	return fmt.Sprintf("listen=%s metrics=%s db=%s fixtures=%t services_file=%q github_secret=%s ci_secret=%s argocd_token=%s github_token=%s",
 		c.Listen, c.MetricsListen, c.DBPath, c.Fixtures, c.ServicesFile,
-		set(c.GitHubWebhookSecret), set(c.CIEventSecret), set(c.ArgoCDToken))
+		set(c.GitHubWebhookSecret), set(c.CIEventSecret), set(c.ArgoCDToken), set(c.GitHubToken))
 }
 
 // FromEnv builds a Config from MYBUILDS_* variables, with defaults for local use.
@@ -72,6 +79,8 @@ func FromEnv() (Config, error) {
 		ArgoCDToken:         os.Getenv("MYBUILDS_ARGOCD_TOKEN"),
 		RuntimeWatch:        envOr("MYBUILDS_RUNTIME_WATCH", "auto"),
 		Verifier:            envOr("MYBUILDS_VERIFIER", "auto"),
+		GitHubToken:         os.Getenv("MYBUILDS_GITHUB_TOKEN"),
+		JobPoller:           envOr("MYBUILDS_JOB_POLLER", "auto"),
 		SQSQueueURL:         os.Getenv("MYBUILDS_SQS_QUEUE_URL"),
 		SQSRegion:           os.Getenv("MYBUILDS_SQS_REGION"),
 		SQSAccessKeyID:      os.Getenv("MYBUILDS_SQS_ACCESS_KEY_ID"),
@@ -79,6 +88,9 @@ func FromEnv() (Config, error) {
 	}
 	if cfg.Verifier != "auto" && cfg.Verifier != "off" {
 		return cfg, fmt.Errorf("MYBUILDS_VERIFIER: %q is not auto or off", cfg.Verifier)
+	}
+	if cfg.JobPoller != "auto" && cfg.JobPoller != "off" {
+		return cfg, fmt.Errorf("MYBUILDS_JOB_POLLER: %q is not auto or off", cfg.JobPoller)
 	}
 	if cfg.RuntimeWatch != "auto" && cfg.RuntimeWatch != "off" {
 		return cfg, fmt.Errorf("MYBUILDS_RUNTIME_WATCH: %q is not auto or off", cfg.RuntimeWatch)

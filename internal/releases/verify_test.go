@@ -92,15 +92,44 @@ func TestVerifyMismatchResetsTheCount(t *testing.T) {
 	expect(t, project7(t, b).Release, S, S, S, S, S, S, S, S)
 }
 
-func TestVerifyFailingCheckFails(t *testing.T) {
+func TestVerifyTwoFailingChecksInARowFail(t *testing.T) {
 	b := rolledOut(t)
 	b.check(120, events.CheckPass, testRelease, 80)
 	b.check(150, events.CheckFail, testRelease, 80)
+	b.check(180, events.CheckFail, testRelease, 80)
 	p := project7(t, b)
 	expect(t, p.Release, F, S, S, S, S, S, S, F)
-	if got := verifyStage(p).FailureReason; got != "HTTP 500 is not an allowed status" {
+	if got := verifyStage(p).FailureReason; got != "HTTP 500 is not an allowed status (2 checks in a row)" {
 		t.Errorf("reason %q", got)
 	}
+	if got := stepNames(p, "verify")[2:]; got[0] != "Check 2=degraded" || got[1] != "Check 3=failed" {
+		t.Errorf("steps %v", got)
+	}
+}
+
+// One failing check, such as release mynids/09f36c4/production/35's TLS
+// handshake that timed out between three and five passes, resets the count
+// and the checks carry on.
+func TestVerifySingleFailingCheckResetsTheCount(t *testing.T) {
+	b := rolledOut(t)
+	for i := range 3 {
+		b.check(120+30*i, events.CheckPass, testRelease, 80)
+	}
+	b.check(210, events.CheckFail, testRelease, 80)
+	p := project7(t, b)
+	expect(t, p.Release, R, S, S, S, S, S, S, R)
+	v := verifyStage(p)
+	if v.Summary != "0 of 5 consecutive checks passed, last check failed: HTTP 500 is not an allowed status" {
+		t.Errorf("summary %q", v.Summary)
+	}
+	if got := stepNames(p, "verify")[4]; got != "Check 4=degraded" {
+		t.Errorf("failing step %q", got)
+	}
+
+	for i := range 5 {
+		b.check(240+30*i, events.CheckPass, testRelease, 80)
+	}
+	expect(t, project7(t, b).Release, S, S, S, S, S, S, S, S)
 }
 
 func TestVerifyWindowEnds(t *testing.T) {
@@ -125,6 +154,18 @@ func TestVerifyWindowEnds(t *testing.T) {
 		{"no checks", func(b *builder) {
 			b.ended(714, events.EndExpired)
 		}, U, U, "No checks ran"},
+		{"unconfirmed failing check", func(b *builder) {
+			b.check(120, events.CheckPass, testRelease, 80)
+			b.check(150, events.CheckFail, testRelease, 80)
+			b.ended(714, events.EndExpired)
+		}, U, U, "before the failed check was confirmed: HTTP 500"},
+		{"failing checks between passes", func(b *builder) {
+			b.check(120, events.CheckFail, testRelease, 80)
+			b.check(150, events.CheckPass, testRelease, 80)
+			b.check(180, events.CheckFail, testRelease, 80)
+			b.check(210, events.CheckPass, testRelease, 80)
+			b.ended(714, events.EndExpired)
+		}, F, F, "after 2 failed checks: HTTP 500"},
 		{"too few passes", func(b *builder) {
 			b.check(120, events.CheckPass, testRelease, 80)
 			b.ended(714, events.EndExpired)

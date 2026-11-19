@@ -25,6 +25,9 @@ import (
 // CheckTimeout bounds one check, connection included.
 const CheckTimeout = 10 * time.Second
 
+// tlsHandshakeTimeout bounds the TLS handshake of the default transport.
+const tlsHandshakeTimeout = 5 * time.Second
+
 // maxBody is how much of a response is read; health bodies are small.
 const maxBody = 64 << 10
 
@@ -40,7 +43,7 @@ func defaultTransport() *http.Transport {
 	return &http.Transport{
 		DisableKeepAlives:   true,
 		ForceAttemptHTTP2:   true,
-		TLSHandshakeTimeout: 5 * time.Second,
+		TLSHandshakeTimeout: tlsHandshakeTimeout,
 		DialContext:         (&net.Dialer{Timeout: 5 * time.Second}).DialContext,
 	}
 }
@@ -93,10 +96,13 @@ func (c Checker) Check(ctx context.Context, v services.Verify, releaseID string,
 	start := time.Now()
 	resp, err := client.Do(req)
 	if err != nil {
+		res.Error = err.Error()
 		switch {
 		case dnsErr != nil:
 			res.DNSOK = false
 			return fail(res, "DNS lookup failed")
+		case tlsErr != nil && isTimeout(tlsErr):
+			return fail(res, fmt.Sprintf("TLS handshake timed out after %s", tlsHandshakeTimeout))
 		case tlsErr != nil:
 			return fail(res, "TLS handshake failed")
 		case errors.Is(err, context.DeadlineExceeded) || isTimeout(err):

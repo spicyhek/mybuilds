@@ -39,7 +39,7 @@
     "2026-11-16T01:25:34Z verifier.check running | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=succeeded(6) verify=running(5)",
     "2026-11-16T01:26:09Z verifier.check succeeded | gitops_commit=succeeded(1) reconcile=succeeded(2) rollout=succeeded(6) verify=succeeded(6)"
   ],
-  "frames_sha256": "19a568bf908633cc4ac1c2a57fcdc390bbd811cdd58b7a782be0023d43e4f2c1",
+  "frames_sha256": "bfa9ba43df1c97acdbb91c805c2461ac16309bd235121a8c35c42c384a40f1e6",
   "release": {
     "release_id": "personal-site/config-118e7f2/production",
     "service": "personal-site",
@@ -167,7 +167,7 @@
             "name": "Old pods scaled down",
             "state": "succeeded",
             "started_at": "2026-11-16T01:23:45Z",
-            "completed_at": "2026-11-16T01:23:45.369764386Z",
+            "completed_at": "2026-11-16T01:23:56.204912656Z",
             "detail": "No old pods remain",
             "reconstructed": false
           },
