@@ -610,12 +610,10 @@ func (f *fold) jobEvidence() map[string][]*stageEvidence {
 			names[i] = s.Name
 		}
 
-		touched := map[string]bool{}
 		current := defaultStage
 		for i, s := range steps {
 			stage, _ := f.svc.StageForStep(job.JobName, names, i)
 			e := get(stage, k.attempt)
-			touched[stage] = true
 			state := stepState(s.Status, s.Conclusion)
 			e.steps = append(e.steps, Step{
 				StageKey: stage, Attempt: k.attempt, Name: s.Name, State: state,
@@ -648,16 +646,23 @@ func (f *fold) jobEvidence() map[string][]*stageEvidence {
 				e.failedStep = job.JobName
 				e.completed = job.CompletedAt
 			}
-			for stage := range touched {
-				e := get(stage, k.attempt)
-				e.allSucceeded = !e.failed && allSucceeded(e.steps)
-			}
 		default:
+			// The stage of the job's latest started step stays open even
+			// when that step has finished: the next step may belong to it.
 			e := get(current, k.attempt)
 			e.running = true
 			if e.started == nil {
 				e.started = job.StartedAt
 			}
+		}
+	}
+
+	// A stage is done once every step it has succeeded and no running job
+	// is still in it. One job can carry several stages, such as Build and
+	// Publish, so a stage the job has moved past is done before the job is.
+	for _, list := range byStage {
+		for _, e := range list {
+			e.allSucceeded = !e.failed && !e.running && allSucceeded(e.steps)
 		}
 	}
 	return byStage

@@ -42,9 +42,11 @@ export function seconds(from?: string, to?: string, now = Date.now()): number | 
 export function duration(sec: number | null): string {
   if (sec === null) return "";
   if (sec < 1) return `${sec.toFixed(1)}s`;
-  if (sec < 60) return `${Math.round(sec)}s`;
-  const m = Math.floor(sec / 60);
-  const s = Math.round(sec % 60);
+  // Round once, before splitting, so 239.6s reads 4m 00s rather than 3m 60s.
+  const total = Math.round(sec);
+  if (total < 60) return `${total}s`;
+  const m = Math.floor(total / 60);
+  const s = total % 60;
   if (m < 60) return `${m}m ${String(s).padStart(2, "0")}s`;
   const h = Math.floor(m / 60);
   return `${h}h ${String(m % 60).padStart(2, "0")}m`;
@@ -120,17 +122,32 @@ export function statusLine(r: Release): { text: string; state: State } {
   const unknown = r.stages.find((s) => s.state === "unknown");
   if (unknown) return { text: `${stageLabel(unknown.key)} › ${unknown.failure_reason ?? "no evidence"}`, state: "unknown" };
 
-  // Nothing active: the next stage is waiting on another system.
+  // Nothing active: the next stage is waiting on another system. While the
+  // release is in progress that wait is still progress, so it spins.
   const next = r.stages.find((s) => s.state === "pending");
   if (next) {
     const prev = r.stages[next.position - 2];
+    const state: State = waitingStage(r) === next ? "running" : "pending";
     const waiting = waitingOn(r, next);
-    if (waiting) return { text: waiting, state: "pending" };
-    if (prev && prev.state === "succeeded") return { text: `${stageLabel(prev.key)} done, waiting for ${stageLabel(next.key)}`, state: "pending" };
+    if (waiting) return { text: waiting, state };
+    if (prev && prev.state === "succeeded") return { text: `${stageLabel(prev.key)} done, waiting for ${stageLabel(next.key)}`, state };
   }
   if (r.status === "succeeded") return { text: "Verified", state: "succeeded" };
   if (r.superseded) return { text: "Superseded by a newer commit", state: "skipped" };
   return { text: OUTCOME_LABEL[r.status], state: r.status };
+}
+
+/**
+ * The stage an in-progress release is waiting to start: the first pending
+ * stage, right after a succeeded one, while no stage is running, failed or
+ * unknown. For example Reconcile, between gitops.updated and Argo CD's sync.
+ */
+export function waitingStage(r: Release): Stage | null {
+  if (r.status !== "running") return null;
+  if (r.stages.some((s) => s.state === "running" || s.state === "failed" || s.state === "unknown")) return null;
+  const next = r.stages.find((s) => s.state === "pending");
+  if (!next) return null;
+  return r.stages[next.position - 2]?.state === "succeeded" ? next : null;
 }
 
 function waitingOn(r: Release, st: Stage): string | null {

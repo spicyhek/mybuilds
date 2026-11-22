@@ -6,9 +6,9 @@
     "2026-11-17T06:25:07Z github.workflow_job running | source=succeeded(2) build=running publish=pending gitops=pending reconcile=pending rollout=pending verify=pending",
     "2026-11-17T06:25:09Z github.workflow_job running | source=succeeded(2) build=running(1) publish=pending gitops=pending reconcile=pending rollout=pending verify=pending",
     "2026-11-17T06:25:10Z github.workflow_run running | source=succeeded(2) build=running(1) publish=pending gitops=pending reconcile=pending rollout=pending verify=pending",
-    "2026-11-17T06:25:50Z github.workflow_job running | source=succeeded(2) build=succeeded(14) publish=pending gitops=pending reconcile=pending rollout=pending verify=pending",
-    "2026-11-17T06:25:54Z github.workflow_job running | source=succeeded(2) build=succeeded(15) publish=pending gitops=pending reconcile=pending rollout=pending verify=pending",
-    "2026-11-17T06:25:54Z github.workflow_run running | source=succeeded(2) build=succeeded(15) publish=pending gitops=pending reconcile=pending rollout=pending verify=pending",
+    "2026-11-17T06:25:50Z github.workflow_job running | source=succeeded(2) build=running(14) publish=pending gitops=pending reconcile=pending rollout=pending verify=pending",
+    "2026-11-17T06:25:54Z github.workflow_job running | source=succeeded(2) build=running(15) publish=pending gitops=pending reconcile=pending rollout=pending verify=pending",
+    "2026-11-17T06:25:54Z github.workflow_run running | source=succeeded(2) build=running(15) publish=pending gitops=pending reconcile=pending rollout=pending verify=pending",
     "2026-11-17T06:28:35Z ci.release.published running | source=succeeded(2) build=succeeded(15) publish=succeeded(1) gitops=pending reconcile=pending rollout=pending verify=pending",
     "2026-11-17T06:28:47Z github.workflow_job running | source=succeeded(2) build=succeeded(15) publish=succeeded(1) gitops=running reconcile=pending rollout=pending verify=pending",
     "2026-11-17T06:28:47Z github.workflow_job running | source=succeeded(2) build=succeeded(22) publish=succeeded(11) gitops=running reconcile=pending rollout=pending verify=pending",
@@ -30,7 +30,7 @@
     "2026-11-17T06:35:40Z verifier.check running | source=succeeded(2) build=succeeded(22) publish=succeeded(11) gitops=succeeded(14) reconcile=succeeded(2) rollout=succeeded(4) verify=running(5)",
     "2026-11-17T06:36:15Z verifier.check succeeded | source=succeeded(2) build=succeeded(22) publish=succeeded(11) gitops=succeeded(14) reconcile=succeeded(2) rollout=succeeded(4) verify=succeeded(6)"
   ],
-  "frames_sha256": "5bba6007bc023359a6ec48c53c77c02f751b4fdb3e43516170f673913ae1e3d2",
+  "frames_sha256": "d65cb0f60e6b8f5f48e023e608d30fb4d46112b0f9ccc480edb765e4868f2841",
   "release": {
     "release_id": "mybuilds/c81b097/production/24",
     "service": "mybuilds",

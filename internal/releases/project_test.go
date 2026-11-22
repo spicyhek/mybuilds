@@ -211,6 +211,36 @@ func TestMissingEvidenceIsUnknownNotSuccess(t *testing.T) {
 	expect(t, project(t, b2), U, S, S, U, P, P, P, P)
 }
 
+// Build and Publish share one job, split at "Push image". While the job is
+// still running, Build closes as soon as a Publish step starts, not when the
+// whole job completes.
+func TestBuildClosesWhenTheJobMovesToPublish(t *testing.T) {
+	building := [][2]string{{"Set up job", "success"}, {"Build image", "success"}, {"Smoke test", ""}}
+	built := [][2]string{{"Set up job", "success"}, {"Build image", "success"}, {"Smoke test", "success"}}
+	pushing := append(slices.Clone(built), [2]string{"Push image", ""})
+
+	b := &builder{t: t}
+	b.run(1, "in_progress", "", 1)
+	b.job(1, "build", "in_progress", "", 2, building...)
+	expect(t, project(t, b), R, S, R, P, P, P, P, P)
+
+	// Every Build step is green but no Publish step has started yet: the
+	// next step could still be a Build step.
+	b = &builder{t: t}
+	b.run(1, "in_progress", "", 1)
+	b.job(1, "build", "in_progress", "", 2, built...)
+	expect(t, project(t, b), R, S, R, P, P, P, P, P)
+
+	b = &builder{t: t}
+	b.run(1, "in_progress", "", 1)
+	b.job(1, "build", "in_progress", "", 2, pushing...)
+	r := project(t, b)
+	expect(t, r, R, S, S, R, P, P, P, P)
+	if got := r.Stages[1].CompletedAt; got == nil || !got.Equal(at(5)) {
+		t.Errorf("build completed_at = %v, want the end of Smoke test %v", got, at(5))
+	}
+}
+
 func TestSourceWithoutWorkflowRunIsUnknown(t *testing.T) {
 	b := &builder{t: t}
 	b.published(1, 7)
