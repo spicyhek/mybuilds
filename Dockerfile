@@ -11,7 +11,6 @@ RUN npm run build
 FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS build
 ARG TARGETOS
 ARG TARGETARCH
-ARG VERSION=dev
 WORKDIR /src
 
 COPY go.mod go.sum ./
@@ -20,7 +19,7 @@ RUN go mod download
 COPY . .
 COPY --from=web /src/web/dist ./web/dist
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" \
+    go build -trimpath -ldflags="-s -w" \
     -o /out/mybuilds ./cmd/server
 
 # distroless has no shell, so the data directory is prepared here and copied

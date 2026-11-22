@@ -57,6 +57,9 @@ svg.i { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor;
 
 /* ---------- top bar ---------- */
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+/* The version sits on the breadcrumb's text baseline; centering would lift its smaller mono text. */
+.top-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.top-version { font-size: 12px; color: var(--subtle); white-space: nowrap; }
 .crumbs { display: flex; align-items: center; gap: 10px; font-size: 15px; min-width: 0; }
 .brand { display: flex; align-items: center; gap: 8px; color: var(--muted); }
 .crumb-sep { color: var(--subtle); }

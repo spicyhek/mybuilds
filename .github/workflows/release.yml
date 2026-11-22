@@ -136,8 +136,6 @@ jobs:
           load: true
           tags: mybuilds:smoke
           platforms: linux/amd64
-          build-args: |
-            VERSION=${{ env.IMAGE_TAG }}
 
       - name: Smoke test
         env:
@@ -161,6 +159,9 @@ jobs:
           grep -iqxF "cache-control: no-store" headers.clean
 
           curl --fail --silent --show-error --output /dev/null http://127.0.0.1:8080/readyz
+          # The binary embeds VERSION; the image must report the one in this commit.
+          curl --fail --silent --show-error http://127.0.0.1:8080/api/v1/meta \
+            | jq --exit-status --arg version "$(tr -d '[:space:]' < VERSION)" '.version == $version' > /dev/null
           curl --fail --silent --show-error http://127.0.0.1:8080/api/v1/releases \
             | jq --exit-status '.releases | length > 0' > /dev/null
           curl --fail --silent --show-error http://127.0.0.1:8080/ \
@@ -183,8 +184,6 @@ jobs:
             ${{ env.IMAGE_NAME }}:latest
             ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           platforms: linux/amd64,linux/arm64
-          build-args: |
-            VERSION=${{ env.IMAGE_TAG }}
 
       - name: Resolve digest
         id: digest
