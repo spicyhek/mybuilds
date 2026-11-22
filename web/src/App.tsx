@@ -12,6 +12,10 @@ import { useLiveReleases } from "./useLiveReleases";
 
 type Theme = "light" | "dark" | null;
 
+// The server's version from /api/v1/meta. A build from before versioning reports a commit tag instead, and the
+// header then shows nothing rather than a hash.
+const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+
 export default function App() {
   const route = useRoute();
   const live = useLiveReleases();
@@ -91,26 +95,33 @@ export default function App() {
   return (
     <>
       <header className="topbar">
-        <div className="crumbs">
-          <a className="brand" href="/" onClick={onLinkClick}>
-            mybuilds
-          </a>
-          <span className="crumb-sep" aria-hidden="true">
-            ›
-          </span>
-          {route.name === "release" && (
-            <>
-              <a className="crumb-link" href="/history" onClick={onLinkClick}>
-                History
-              </a>
-              <span className="crumb-sep" aria-hidden="true">
-                ›
-              </span>
-            </>
+        <div className="top-title">
+          <div className="crumbs">
+            <a className="brand" href="/" onClick={onLinkClick}>
+              mybuilds
+            </a>
+            <span className="crumb-sep" aria-hidden="true">
+              ›
+            </span>
+            {route.name === "release" && (
+              <>
+                <a className="crumb-link" href="/history" onClick={onLinkClick}>
+                  History
+                </a>
+                <span className="crumb-sep" aria-hidden="true">
+                  ›
+                </span>
+              </>
+            )}
+            <span className="crumb-cur" title={crumb}>
+              {crumb}
+            </span>
+          </div>
+          {meta && SEMVER.test(meta.version) && (
+            <span className="top-version mono" title="mybuilds version">
+              v{meta.version}
+            </span>
           )}
-          <span className="crumb-cur" title={crumb}>
-            {crumb}
-          </span>
         </div>
         <div className="top-actions">
           <nav className="nav" aria-label="Screens">

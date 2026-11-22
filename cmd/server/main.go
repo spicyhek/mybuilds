@@ -19,6 +19,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/client-go/rest"
 
+	"github.com/spicyhek/mybuilds"
 	"github.com/spicyhek/mybuilds/internal/config"
 	"github.com/spicyhek/mybuilds/internal/fixtures"
 	"github.com/spicyhek/mybuilds/internal/httpapi"
@@ -33,8 +34,8 @@ import (
 	"github.com/spicyhek/mybuilds/web"
 )
 
-// version is set at build time with -ldflags "-X main.version=...".
-var version = "dev"
+// version is the service's semantic version, embedded from the VERSION file at the repository root.
+var version = mybuilds.Version
 
 func main() {
 	if err := run(); err != nil {

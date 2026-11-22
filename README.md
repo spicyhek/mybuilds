@@ -146,7 +146,7 @@ serves production, screenshots and the CI smoke test.
 | `GET /api/v1/releases/{release_id}/timeline` | Every state the release passed through, projected from its events in order, for replay. See [`docs/replay.md`](docs/replay.md) |
 | `GET /api/v1/releases/{release_id}/events` | Every normalized event the release's projection reads, in ID order, for recording it as a test fixture. See [`docs/replay.md`](docs/replay.md) |
 | `GET /api/v1/stream` | Server-Sent Events: `hello`, then `release.created` and `release.updated` with the full release view. The SSE `id` is the event ID; a reconnect with `Last-Event-ID` replays what was missed, or sends `snapshot` when the cursor is too old |
-| `GET /api/v1/meta` | Version, release ID, fixture mode and the public parts of the service map |
+| `GET /api/v1/meta` | Version (from `VERSION`), release ID, fixture mode and the public parts of the service map |
 | `POST /hooks/github` | GitHub `workflow_run` and `workflow_job` webhooks |
 | `POST /api/v1/ci-events` | CI-signed `release.published`, `gitops.updated`, `gitops.superseded` |
 | `POST /hooks/argocd` | Argo CD Notifications |
@@ -172,6 +172,30 @@ build` is needed for the image. The image is `distroless/static`, runs as
 `nonroot` (uid 65532) and keeps its database in `/data`. When a volume is mounted there, set `fsGroup: 65532` on
 the pod. SQLite comes from the pure-Go `modernc.org/sqlite`, so the build has
 `CGO_ENABLED=0` and cross-compiles for the cluster's arm64 nodes.
+
+## Versioning
+
+mybuilds follows [Semantic Versioning](https://semver.org/). The version is in
+`VERSION`, embedded into the binary by `version.go`, so a local run, the
+tests and the image report the same one: in `/api/v1/meta`, the UI header,
+the `mybuilds_build_info` metric and the User-Agent of its own requests.
+`CHANGELOG.md` lists what each version changed. Bump it in the PR that makes
+the change:
+
+- MAJOR when a caller that worked before would now fail: an event sender
+  (GitHub, Argo CD, a CI workflow) or a reader of `/api/v1/*`.
+- MINOR for a new feature, endpoint, field or tracked service, or a changed
+  default that keeps callers working.
+- PATCH for a bug fix.
+
+Changes to CI, docs or tests alone need no bump. After the PR merges, tag its
+merge commit and push the tag (tags do not start a release; images keep their
+`sha-` tags):
+
+```bash
+git tag -a v1.11.0 <merge commit> -m "mybuilds 1.11.0"
+git push origin v1.11.0
+```
 
 ## Tests
 
