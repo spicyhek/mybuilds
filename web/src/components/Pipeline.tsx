@@ -1,5 +1,5 @@
 import type { Release, Stage } from "../api";
-import { STATE_LABEL, stageLabel, stageTimer } from "../format";
+import { STATE_LABEL, stageLabel, stageTimer, waitingStage } from "../format";
 import { StateIcon } from "./Icons";
 
 interface Props {
@@ -13,6 +13,7 @@ interface Props {
 
 /** The big pipeline on the player card: one node per stage with a timer. */
 export function Pipeline({ release, now, focus, pinned, onPick }: Props) {
+  const waiting = waitingStage(release);
   return (
     <ol className="pipeline big" aria-label="Pipeline stages">
       {release.stages.map((st, i) => (
@@ -22,6 +23,7 @@ export function Pipeline({ release, now, focus, pinned, onPick }: Props) {
           prev={release.stages[i - 1]}
           now={now}
           first={i === 0}
+          waiting={waiting === st}
           focused={focus === st.key}
           pinned={pinned && focus === st.key}
           onPick={onPick}
@@ -36,6 +38,7 @@ function PipelineNode({
   prev,
   now,
   first,
+  waiting,
   focused,
   pinned,
   onPick,
@@ -44,12 +47,20 @@ function PipelineNode({
   prev?: Stage;
   now: number;
   first: boolean;
+  /** The release is waiting on another system to start this stage. */
+  waiting: boolean;
   focused: boolean;
   pinned: boolean;
   onPick: (key: string) => void;
 }) {
   const timer = stageTimer(st, now);
-  const lineClass = !prev ? "" : prev.state === "succeeded" || prev.state === "skipped" ? (st.state === "running" ? "active" : "done") : "";
+  const lineClass = !prev
+    ? ""
+    : prev.state === "succeeded" || prev.state === "skipped"
+      ? st.state === "running" || waiting
+        ? "active"
+        : "done"
+      : "";
   return (
     <>
       {!first && <li className={`line ${lineClass}`} aria-hidden="true" />}
